@@ -45,21 +45,57 @@ const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 async function askGroq(history: ChatMsg[]): Promise<string | null> {
   const key = process.env.GROQ_API_KEY;
   if (!key) return null;
+
   const res = await fetch(GROQ_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${key}`,
+    },
     body: JSON.stringify({
-      model: process.env.GROQ_MODEL || "llama-3.1-8b-instant",
+      model: "openai/gpt-oss-120b",
       messages: [{ role: "system", content: SYSTEM_PROMPT }, ...history],
-      temperature: 0.7,
-      max_tokens: 220,
+
+      temperature: 0.6,
+
+      // Gives the model enough room for reasoning + final answer.
+      max_completion_tokens: 512,
+
+      // Strong enough reasoning while keeping latency reasonable.
+      reasoning_effort: "medium",
+
+      // Do not return the reasoning field to the visitor.
+      include_reasoning: false,
+
+      // Let GPT-OSS use live web search when needed.
+      tools: [
+        {
+          type: "browser_search",
+        },
+      ],
+
+      // Model decides when web search is actually needed.
+      tool_choice: "auto",
     }),
   });
+
   if (!res.ok) {
-    console.error("groq error:", res.status, await res.text().catch(() => ""));
+    console.error(
+      "groq error:",
+      res.status,
+      await res.text().catch(() => "")
+    );
     return null;
   }
-  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+
+  const data = (await res.json()) as {
+    choices?: Array<{
+      message?: {
+        content?: string;
+      };
+    }>;
+  };
+
   return data.choices?.[0]?.message?.content?.trim() || null;
 }
 
@@ -70,13 +106,18 @@ async function askFallback(history: ChatMsg[]): Promise<string | null> {
   try {
     const { default: ZAI } = await import("z-ai-web-dev-sdk");
     const zai = await ZAI.create();
+
     const completion = await zai.chat.completions.create({
       messages: [{ role: "assistant", content: SYSTEM_PROMPT }, ...history],
       thinking: { type: "disabled" },
     });
+
     return completion.choices[0]?.message?.content?.trim() || null;
   } catch (err) {
-    console.error("fallback engine unavailable:", err instanceof Error ? err.message : err);
+    console.error(
+      "fallback engine unavailable:",
+      err instanceof Error ? err.message : err
+    );
     return null;
   }
 }
@@ -88,29 +129,60 @@ export async function POST(req: NextRequest) {
 
     // sanitize: keep the last 10 turns, hard-cap length
     const history: ChatMsg[] = incoming
-      .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+      .filter(
+        (m) =>
+          (m.role === "user" || m.role === "assistant") &&
+          typeof m.content === "string"
+      )
       .slice(-10)
-      .map((m) => ({ role: m.role, content: m.content.slice(0, 1200) }));
+      .map((m) => ({
+        role: m.role,
+        content: m.content.slice(0, 1200),
+      }));
 
-    if (history.length === 0 || history[history.length - 1].role !== "user") {
-      return NextResponse.json({ error: "No message." }, { status: 400 });
+    if (
+      history.length === 0 ||
+      history[history.length - 1].role !== "user"
+    ) {
+      return NextResponse.json(
+        { error: "No message." },
+        { status: 400 }
+      );
     }
 
     // fastest engine first; the fallback keeps ORION immune to outages
     let reply: string | null = null;
+
     try {
       reply = await askGroq(history);
     } catch (err) {
       console.error("groq attempt failed:", err);
     }
-    if (!reply) reply = await askFallback(history); // guarded — can never throw
 
     if (!reply) {
-      return NextResponse.json({ error: "ORION is recalibrating. Try again shortly, sir." }, { status: 502 });
+      reply = await askFallback(history);
     }
+
+    if (!reply) {
+      return NextResponse.json(
+        {
+          error:
+            "ORION is recalibrating. Try again shortly, sir.",
+        },
+        { status: 502 }
+      );
+    }
+
     return NextResponse.json({ reply });
   } catch (err) {
     console.error("orion route error:", err);
-    return NextResponse.json({ error: "ORION is offline. Try again shortly." }, { status: 500 });
+
+    return NextResponse.json(
+      {
+        error:
+          "ORION is offline. Try again shortly.",
+      },
+      { status: 500 }
+    );
   }
 }
