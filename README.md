@@ -410,4 +410,4 @@ The repository may be viewed for educational and reference purposes. The portfol
 <p align="center">
   <sub>Built for the browser. Designed like a mission.</sub>
 </p>
-```
+
