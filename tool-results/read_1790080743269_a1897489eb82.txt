@@ -1,0 +1,927 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useRef, useState } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import { MousePointer2, Hand, X, Orbit } from "lucide-react";
+     6→
+     7→interface Skill {
+     8→  name: string;
+     9→  category: "Core" | "Visual" | "Mind" | "Tools";
+    10→  level: number;
+    11→  blurb: string;
+    12→  detail: string;
+    13→  ring: 0 | 1 | 2;
+    14→  angle: number;
+    15→  featured?: boolean; // the skill that IS this website
+    16→}
+    17→
+    18→const CATEGORY_COLOR: Record<Skill["category"], string> = {
+    19→  Core: "#ff8b3d",
+    20→  Visual: "#ffc966",
+    21→  Mind: "#ff5e2b",
+    22→  Tools: "#e8d5c0",
+    23→};
+    24→
+    25→const SKILLS: Skill[] = [
+    26→  { name: "JavaScript", category: "Core", level: 95, featured: true, blurb: "No framework. No game engine. No template. The rocket that just ignited behind this panel is plain JavaScript — you are not reading my portfolio, you are flying it.", detail: "Flight log: scroll and the strongback swings clear at T-0, the plume flashes shock diamonds, the pad falls away into a persistent exhaust pillar — then Earth's limb, a space station, satellites, VERMILION → AURELIA → GLACIUS. 60fps. On your phone. Right now. That is the demo.", ring: 0, angle: 0.3 },
+    27→  { name: "React", category: "Core", level: 88, blurb: "A precision instrument for managing complexity at scale — correct boundaries, deliberate data flow, predictable renders.", detail: "Flight log: used for adaptive timers, dashboard UIs and this portfolio. I care about where state lives, when a component re-renders, and keeping the tree calm instead of churning.", ring: 0, angle: 2.6 },
+    28→  { name: "Canvas API", category: "Visual", level: 93, blurb: "Real-time annotation systems, particle physics and custom rendering pipelines — 60fps, zero dependencies.", detail: "Flight log: my home turf. Laser-pointer trails with verlet physics, freehand ink smoothing, layer compositing and hit-testing — all hand-rolled on a single 2D context.", ring: 0, angle: 4.6 },
+    29→  { name: "HTML / CSS", category: "Visual", level: 92, blurb: "Interfaces that respond gracefully on every viewport, with animation systems that feel physically accurate.", detail: "Flight log: fluid type scales, backdrop glass, scroll choreography and layouts that survive a 320px phone without a single horizontal jiggle. The boring layer, done obsessively.", ring: 1, angle: 1.2 },
+    30→  { name: "Three.js / WebGL", category: "Visual", level: 80, blurb: "Immersive 3D scenes — orbital mechanics, terrain meshes and shader experiments with an engineer's rigour.", detail: "Flight log: built the live launch sequence behind this page — procedural vehicles, particle exhaust, shader atmosphere rims and post-processing bloom, tuned to hold 60fps.", ring: 1, angle: 2.9 },
+    31→  { name: "UI / UX Design", category: "Visual", level: 82, blurb: "Visual hierarchy and spatial rhythm — interfaces that feel intuitive on first contact and disappear into the task.", detail: "Flight log: I sketch motion before pixels — timing curves, easing, where attention lands first. Good UX is the tool the user never notices using.", ring: 1, angle: 4.4 },
+    32→  { name: "Physics", category: "Mind", level: 90, blurb: "Not a subject — a lens. Mechanics, electromagnetism and waves, translated directly into computational models.", detail: "Flight log: projectile arcs in a laser game, elastic collisions in ink, gravity in scroll scenes. Every simulation on this site is grounded in real equations, not faked easing.", ring: 1, angle: 5.7 },
+    33→  { name: "Mathematics", category: "Mind", level: 88, blurb: "Linear algebra to differential equations — fluency that makes code correct by construction, not by trial.", detail: "Flight log: rotation matrices for pseudo-3D orbit rings, numeric integration for particle systems, easing derivations. Math first means less debugging later.", ring: 2, angle: 0.8 },
+    34→  { name: "Physics Simulation", category: "Mind", level: 86, blurb: "Real-time orbital mechanics, fluid approximations and elastic collisions, grounded in actual physical law.", detail: "Flight log: semi-implicit Euler at it again — smoke that billows because buoyancy says so, sparks with real drag. Plausible motion is the cheapest special effect there is.", ring: 2, angle: 2.0 },
+    35→  { name: "Problem Solving", category: "Mind", level: 93, blurb: "Decomposing the impossible into the merely difficult — then shipping the answer.", detail: "Flight log: the launch sequence behind you needed 40 small inventions before it ran at 60fps on a phone. I don't skip hard problems — I slice them.", ring: 2, angle: 3.4 },
+    36→  { name: "Git & GitHub", category: "Tools", level: 85, blurb: "Disciplined version control — atomic commits and history that reads like documentation.", detail: "Flight log: feature branches, meaningful messages, and a history you can bisect. My repos read like mission logs, not a graveyard of 'final_v2_REAL'.", ring: 2, angle: 4.5 },
+    37→  { name: "Python", category: "Tools", level: 75, blurb: "Scripting, tooling and gluing systems together when the browser isn't the whole story.", detail: "Flight log: texture generators, data wrangling, small automations that pre-compute what the browser would choke on. The quiet support crew of every launch.", ring: 2, angle: 5.6 },
+    38→];
+    39→
+    40→const RING_RADIUS = [126, 196, 264];
+    41→const RING_SPEED = [0.34, 0.21, 0.13];
+    42→
+    43→export default function SkillOrbit() {
+    44→  const canvasRef = useRef<HTMLCanvasElement>(null);
+    45→  const wrapRef = useRef<HTMLDivElement>(null);
+    46→  const [selected, setSelected] = useState<Skill>(SKILLS[0]);
+    47→  const [hovered, setHovered] = useState<Skill | null>(null);
+    48→  const [expanded, setExpanded] = useState<Skill | null>(null);
+    49→  const selectedRef = useRef<Skill>(SKILLS[0]);
+    50→
+    51→  useEffect(() => {
+    52→    selectedRef.current = selected;
+    53→  }, [selected]);
+    54→
+    55→  // lock scroll + ESC to close while the dossier is open
+    56→  useEffect(() => {
+    57→    if (!expanded) return;
+    58→    document.body.classList.add("locked");
+    59→    const onKey = (e: KeyboardEvent) => {
+    60→      if (e.key === "Escape") setExpanded(null);
+    61→    };
+    62→    window.addEventListener("keydown", onKey);
+    63→    return () => {
+    64→      document.body.classList.remove("locked");
+    65→      window.removeEventListener("keydown", onKey);
+    66→    };
+    67→  }, [expanded]);
+    68→
+    69→  useEffect(() => {
+    70→    const canvas = canvasRef.current!;
+    71→    const wrap = wrapRef.current!;
+    72→    const ctx = canvas.getContext("2d")!;
+    73→    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    74→    const dispFam =
+    75→      getComputedStyle(document.documentElement).getPropertyValue("--font-display").trim() ||
+    76→      "sans-serif";
+    77→
+    78→    let cssW = wrap.clientWidth;
+    79→    let cssH = cssW;
+    80→    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    81→
+    82→    const resize = () => {
+    83→      cssW = wrap.clientWidth;
+    84→      cssH = cssW;
+    85→      canvas.width = cssW * dpr;
+    86→      canvas.height = cssH * dpr;
+    87→      canvas.style.width = `${cssW}px`;
+    88→      canvas.style.height = `${cssH}px`;
+    89→    };
+    90→    resize();
+    91→    const ro = new ResizeObserver(resize);
+    92→    ro.observe(wrap);
+    93→
+    94→    // world scale factor relative to design size 640
+    95→    const S = () => cssW / 640;
+    96→
+    97→    // interaction state
+    98→    let hoverIdx = -1;
+    99→    let dragOffset = 0;
+   100→    let dragVel = 0;
+   101→    let dragging = false;
+   102→    let lastX = 0;
+   103→    let tiltX = 0; // extra tilt from pointer
+   104→    const starPositions = Array.from({ length: 70 }, () => ({
+   105→      x: Math.random(),
+   106→      y: Math.random(),
+   107→      r: 0.4 + Math.random() * 1.1,
+   108→      tw: Math.random() * Math.PI * 2,
+   109→    }));
+   110→
+   111→    // ── realism kit: procedural planet surfaces, an asteroid belt, a
+   112→    //    passing comet and a ring system on the WebGL world ──
+   113→    const shadeHex = (hex: string, amt: number) => {
+   114→      const n = parseInt(hex.slice(1), 16);
+   115→      const ch = (v: number) => Math.min(255, Math.max(0, Math.round(v)));
+   116→      const r = ch(((n >> 16) & 255) * (1 + amt));
+   117→      const g = ch(((n >> 8) & 255) * (1 + amt));
+   118→      const b = ch((n & 255) * (1 + amt));
+   119→      return `rgb(${r},${g},${b})`;
+   120→    };
+   121→    const planetTexCache = new Map<number, HTMLCanvasElement>();
+   122→    const planetTex = (i: number): HTMLCanvasElement => {
+   123→      const hit = planetTexCache.get(i);
+   124→      if (hit) return hit;
+   125→      const size = 96;
+   126→      const cv = document.createElement("canvas");
+   127→      cv.width = cv.height = size;
+   128→      const g = cv.getContext("2d")!;
+   129→      const base = CATEGORY_COLOR[SKILLS[i].category];
+   130→      g.fillStyle = base;
+   131→      g.fillRect(0, 0, size, size);
+   132→      let seed = i * 9973 + 17;
+   133→      const rnd = () => {
+   134→        seed = (seed * 16807) % 2147483647;
+   135→        return seed / 2147483647;
+   136→      };
+   137→      const shades = [shadeHex(base, -0.42), shadeHex(base, -0.2), shadeHex(base, 0.16), shadeHex(base, 0.32)];
+   138→      for (let k = 0; k < 46; k++) {
+   139→        const x = rnd() * size;
+   140→        const y = rnd() * size;
+   141→        const r = 3 + rnd() * 12;
+   142→        g.fillStyle = shades[Math.floor(rnd() * shades.length)];
+   143→        g.globalAlpha = 0.15 + rnd() * 0.22;
+   144→        g.beginPath();
+   145→        if (rnd() > 0.6) g.ellipse(x, y, r * (1 + rnd()), r * 0.55, rnd() * Math.PI, 0, Math.PI * 2);
+   146→        else g.arc(x, y, r, 0, Math.PI * 2);
+   147→        g.fill();
+   148→      }
+   149→      g.globalAlpha = 1;
+   150→      planetTexCache.set(i, cv);
+   151→      return cv;
+   152→    };
+   153→    const RINGED = new Set<number>([SKILLS.findIndex((s) => s.name.startsWith("Three"))]);
+   154→    const belt = Array.from({ length: 88 }, () => ({
+   155→      a0: Math.random() * Math.PI * 2,
+   156→      rr: 0.94 + Math.random() * 0.12,
+   157→      r: 0.5 + Math.random() * 1.1,
+   158→      speed: 0.05 + Math.random() * 0.05,
+   159→      c: Math.random() > 0.5 ? "#8a7d72" : "#6f6459",
+   160→    }));
+   161→    const comet = { active: false, t0: 0, next: 4, x0: 0, y0: 0, x1: 0, y1: 0 };
+   162→
+   163→    const orbPos = (s: Skill, t: number) => {
+   164→      const a = s.angle + t * RING_SPEED[s.ring] + dragOffset;
+   165→      const r = RING_RADIUS[s.ring] * S();
+   166→      const z = Math.sin(a); // depth -1..1
+   167→      return {
+   168→        x: cssW / 2 + Math.cos(a) * r,
+   169→        y: cssH / 2 + z * r * 0.4 + tiltX * r * 0.08,
+   170→        depth: (z + 1) / 2, // 0 back → 1 front
+   171→      };
+   172→    };
+   173→
+   174→    const pick = (mx: number, my: number, t: number): number => {
+   175→      let best = -1;
+   176→      let bestD = 26;
+   177→      SKILLS.forEach((s, i) => {
+   178→        const p = orbPos(s, t);
+   179→        const scale = 0.72 + p.depth * 0.55;
+   180→        const rr = (10 + (s.level / 100) * 9) * scale * S() + 12;
+   181→        const d = Math.hypot(mx - p.x, my - p.y);
+   182→        if (d < Math.max(rr, 24) && d < bestD + 12) {
+   183→          bestD = d;
+   184→          best = i;
+   185→        }
+   186→      });
+   187→      return best;
+   188→    };
+   189→
+   190→    const onMove = (e: PointerEvent) => {
+   191→      const rect = canvas.getBoundingClientRect();
+   192→      const mx = e.clientX - rect.left;
+   193→      const my = e.clientY - rect.top;
+   194→      if (dragging) {
+   195→        const dx = e.clientX - lastX;
+   196→        lastX = e.clientX;
+   197→        dragOffset += dx * 0.006;
+   198→        dragVel = dx * 0.006;
+   199→        return;
+   200→      }
+   201→      const t = performance.now() / 1000;
+   202→      hoverIdx = pick(mx, my, t);
+   203→      setHovered(hoverIdx >= 0 ? SKILLS[hoverIdx] : null);
+   204→      // gentle tilt toward pointer
+   205→      const ny = (my / cssH - 0.5) * 2;
+   206→      tiltX += ((-ny * 1.2) - tiltX) * 0.08;
+   207→    };
+   208→
+   209→    const onDown = (e: PointerEvent) => {
+   210→      const rect = canvas.getBoundingClientRect();
+   211→      const mx = e.clientX - rect.left;
+   212→      const my = e.clientY - rect.top;
+   213→      const t = performance.now() / 1000;
+   214→      const hit = pick(mx, my, t);
+   215→      if (hit >= 0) {
+   216→        setSelected(SKILLS[hit]);
+   217→        setExpanded(SKILLS[hit]); // open the full dossier
+   218→        return;
+   219→      }
+   220→      dragging = true;
+   221→      lastX = e.clientX;
+   222→      canvas.setPointerCapture(e.pointerId);
+   223→    };
+   224→
+   225→    const onUp = () => {
+   226→      dragging = false;
+   227→    };
+   228→
+   229→    const onLeave = () => {
+   230→      hoverIdx = -1;
+   231→      setHovered(null);
+   232→    };
+   233→
+   234→    canvas.addEventListener("pointermove", onMove);
+   235→    canvas.addEventListener("pointerdown", onDown);
+   236→    canvas.addEventListener("pointerup", onUp);
+   237→    canvas.addEventListener("pointerleave", onLeave);
+   238→    canvas.style.touchAction = "pan-y";
+   239→
+   240→    let raf = 0;
+   241→    const draw = () => {
+   242→      raf = requestAnimationFrame(draw);
+   243→      const t = performance.now() / 1000;
+   244→      if (!dragging) {
+   245→        dragOffset += dragVel;
+   246→        dragVel *= 0.94;
+   247→        if (!reduced) dragOffset += 0.0016; // slow auto-rotate
+   248→      }
+   249→
+   250→      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+   251→      ctx.clearRect(0, 0, cssW, cssH);
+   252→
+   253→      const cx = cssW / 2;
+   254→      const cy = cssH / 2;
+   255→      const sc = S();
+   256→
+   257→      // backdrop: two faint nebula washes, then the starfield
+   258→      const nebA = ctx.createRadialGradient(cssW * 0.18, cssH * 0.24, 0, cssW * 0.18, cssH * 0.24, cssW * 0.4);
+   259→      nebA.addColorStop(0, "rgba(255,120,60,0.05)");
+   260→      nebA.addColorStop(1, "rgba(255,120,60,0)");
+   261→      ctx.fillStyle = nebA;
+   262→      ctx.fillRect(0, 0, cssW, cssH);
+   263→      const nebB = ctx.createRadialGradient(cssW * 0.82, cssH * 0.78, 0, cssW * 0.82, cssH * 0.78, cssW * 0.42);
+   264→      nebB.addColorStop(0, "rgba(140,100,255,0.05)");
+   265→      nebB.addColorStop(1, "rgba(140,100,255,0)");
+   266→      ctx.fillStyle = nebB;
+   267→      ctx.fillRect(0, 0, cssW, cssH);
+   268→
+   269→      for (const st of starPositions) {
+   270→        const tw = 0.35 + 0.3 * Math.sin(t * 1.4 + st.tw);
+   271→        ctx.globalAlpha = tw;
+   272→        ctx.fillStyle = "#e8d5c0";
+   273→        ctx.beginPath();
+   274→        ctx.arc(st.x * cssW, st.y * cssH, st.r * sc, 0, Math.PI * 2);
+   275→        ctx.fill();
+   276→      }
+   277→      ctx.globalAlpha = 1;
+   278→
+   279→      const pulse = 30 + Math.sin(t * 2.2) * 2.5;
+   280→
+   281→      // asteroid belt between ring 0 and ring 1 — drawn in two halves so
+   282→      // the system reads as genuinely three-dimensional
+   283→      const beltR = ((RING_RADIUS[0] + RING_RADIUS[1]) / 2) * sc;
+   284→      const drawBelt = (front: boolean) => {
+   285→        for (const a of belt) {
+   286→          const ang = a.a0 + t * a.speed + dragOffset * 0.9;
+   287→          const z = Math.sin(ang);
+   288→          if (front !== z > 0) continue;
+   289→          const bx2 = cx + Math.cos(ang) * beltR * a.rr;
+   290→          const by2 = cy + z * beltR * a.rr * 0.4 + tiltX * beltR * a.rr * 0.08;
+   291→          const dep = (z + 1) / 2;
+   292→          ctx.globalAlpha = (front ? 0.5 : 0.2) * (0.35 + dep * 0.65);
+   293→          ctx.fillStyle = a.c;
+   294→          ctx.beginPath();
+   295→          ctx.arc(bx2, by2, a.r * sc * (0.6 + dep * 0.7), 0, Math.PI * 2);
+   296→          ctx.fill();
+   297→        }
+   298→        ctx.globalAlpha = 1;
+   299→      };
+   300→
+   301→      // orbit rings, depth-aware: back halves now (dim), front after planets
+   302→      const drawRings = (front: boolean) => {
+   303→        RING_RADIUS.forEach((r, i) => {
+   304→          ctx.beginPath();
+   305→          ctx.ellipse(
+   306→            cx,
+   307→            cy + tiltX * r * sc * 0.08,
+   308→            r * sc,
+   309→            r * sc * 0.4,
+   310→            0,
+   311→            front ? 0 : Math.PI,
+   312→            front ? Math.PI : Math.PI * 2
+   313→          );
+   314→          ctx.strokeStyle = `rgba(255,171,105,${(front ? 0.22 : 0.1) + (hoverIdx >= 0 ? 0.04 : 0)})`;
+   315→          ctx.lineWidth = front ? 1.1 : 0.9;
+   316→          ctx.setLineDash(i === 2 && front ? [3, 7] : []);
+   317→          ctx.stroke();
+   318→          ctx.setLineDash([]);
+   319→        });
+   320→      };
+   321→
+   322→      // a comet grazes the system every so often — pure punctuation
+   323→      if (comet.active) {
+   324→        const q = (t - comet.t0) / 2.8;
+   325→        if (q >= 1) comet.active = false;
+   326→        else {
+   327→          const fx = comet.x0 + (comet.x1 - comet.x0) * q;
+   328→          const fy = comet.y0 + (comet.y1 - comet.y0) * q + Math.sin(q * Math.PI) * -24;
+   329→          const hx = comet.x0 + (comet.x1 - comet.x0) * Math.max(0, q - 0.3);
+   330→          const hy = comet.y0 + (comet.y1 - comet.y0) * Math.max(0, q - 0.3);
+   331→          const tail = ctx.createLinearGradient(fx, fy, hx, hy);
+   332→          tail.addColorStop(0, "rgba(255,230,200,0.8)");
+   333→          tail.addColorStop(1, "rgba(255,160,90,0)");
+   334→          ctx.strokeStyle = tail;
+   335→          ctx.lineWidth = 2;
+   336→          ctx.beginPath();
+   337→          ctx.moveTo(fx, fy);
+   338→          ctx.lineTo(hx, hy);
+   339→          ctx.stroke();
+   340→          const hg = ctx.createRadialGradient(fx, fy, 0, fx, fy, 10 * sc);
+   341→          hg.addColorStop(0, "rgba(255,244,224,0.95)");
+   342→          hg.addColorStop(1, "rgba(255,180,90,0)");
+   343→          ctx.fillStyle = hg;
+   344→          ctx.beginPath();
+   345→          ctx.arc(fx, fy, 10 * sc, 0, Math.PI * 2);
+   346→          ctx.fill();
+   347→        }
+   348→      } else if (t > comet.next) {
+   349→        comet.active = true;
+   350→        comet.t0 = t;
+   351→        comet.next = t + 9 + Math.random() * 7;
+   352→        const leftFirst = Math.random() > 0.5;
+   353→        comet.x0 = leftFirst ? -20 : cssW + 20;
+   354→        comet.y0 = cssH * (0.1 + Math.random() * 0.3);
+   355→        comet.x1 = leftFirst ? cssW + 20 : -20;
+   356→        comet.y1 = cssH * (0.35 + Math.random() * 0.4);
+   357→      }
+   358→
+   359→      drawBelt(false);
+   360→      drawRings(false);
+   361→
+   362→      // ── planet painter: textured body, terminator shading, rings —
+   363→      //    called per planet in two depth passes around the sun ──
+   364→      const order = SKILLS.map((s, i) => ({ s, i, p: orbPos(s, t) })).sort((a, b) => a.p.depth - b.p.depth);
+   365→      const labelJobs: Array<{ s: Skill; x: number; y: number; priority: number; active: boolean }> = [];
+   366→      const drawPlanet = ({ s, i, p }: (typeof order)[number]) => {
+   367→        const scale = 0.72 + p.depth * 0.55;
+   368→        const r = (10 + (s.level / 100) * 9) * scale * sc;
+   369→        const isActive = i === hoverIdx || s === selectedRef.current;
+   370→        const color = CATEGORY_COLOR[s.category];
+   371→        const alpha = 0.5 + p.depth * 0.5;
+   372→        const ang = s.angle + t * RING_SPEED[s.ring] + dragOffset;
+   373→
+   374→        // motion trail — a fading arc streaming behind every planet
+   375→        const tr = RING_RADIUS[s.ring] * S();
+   376→        for (let k = 1; k <= 20; k++) {
+   377→          const aa = ang - k * 0.05;
+   378→          const z2 = Math.sin(aa);
+   379→          const tx = cx + Math.cos(aa) * tr;
+   380→          const ty = cy + z2 * tr * 0.4 + tiltX * tr * 0.08;
+   381→          const tScale = 0.72 + ((z2 + 1) / 2) * 0.55;
+   382→          ctx.globalAlpha = (1 - k / 21) * 0.13 * tScale * (isActive ? 2 : 1);
+   383→          ctx.fillStyle = color;
+   384→          ctx.beginPath();
+   385→          ctx.arc(tx, ty, r * 0.44 * tScale, 0, Math.PI * 2);
+   386→          ctx.fill();
+   387→        }
+   388→        ctx.globalAlpha = alpha;
+   389→
+   390→        // atmosphere glow
+   391→        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3.2);
+   392→        g.addColorStop(0, `${color}${isActive ? "88" : "44"}`);
+   393→        g.addColorStop(1, `${color}00`);
+   394→        ctx.fillStyle = g;
+   395→        ctx.beginPath();
+   396→        ctx.arc(p.x, p.y, r * 3.2, 0, Math.PI * 2);
+   397→        ctx.fill();
+   398→
+   399→        // procedural textured body (slow rotation, alternating direction)
+   400→        const tex = planetTex(i);
+   401→        ctx.save();
+   402→        ctx.beginPath();
+   403→        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+   404→        ctx.clip();
+   405→        ctx.translate(p.x, p.y);
+   406→        ctx.rotate(t * 0.14 * (i % 2 ? 1 : -1) + i);
+   407→        ctx.drawImage(tex, -r * 1.25, -r * 1.25, r * 2.5, r * 2.5);
+   408→        ctx.restore();
+   409→
+   410→        // terminator shading + sunlit highlight — the 3D part
+   411→        const shade = ctx.createRadialGradient(p.x - r * 0.38, p.y - r * 0.4, r * 0.1, p.x, p.y, r * 1.15);
+   412→        shade.addColorStop(0, "rgba(255,246,234,0.3)");
+   413→        shade.addColorStop(0.42, "rgba(255,255,255,0)");
+   414→        shade.addColorStop(0.78, "rgba(12,6,4,0.42)");
+   415→        shade.addColorStop(1, "rgba(8,4,2,0.76)");
+   416→        ctx.save();
+   417→        ctx.beginPath();
+   418→        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+   419→        ctx.clip();
+   420→        ctx.fillStyle = shade;
+   421→        ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+   422→        ctx.restore();
+   423→
+   424→        // atmosphere rim
+   425→        ctx.globalAlpha = alpha * 0.4;
+   426→        ctx.strokeStyle = color;
+   427→        ctx.lineWidth = 1.3;
+   428→        ctx.beginPath();
+   429→        ctx.arc(p.x, p.y, r + 1.2 * sc, 0, Math.PI * 2);
+   430→        ctx.stroke();
+   431→        ctx.globalAlpha = 1;
+   432→
+   433→        // ring system on the WebGL world
+   434→        if (RINGED.has(i)) {
+   435→          ctx.save();
+   436→          ctx.translate(p.x, p.y);
+   437→          ctx.rotate(0.5);
+   438→          ctx.scale(1, 0.36);
+   439→          ctx.globalAlpha = alpha * 0.8;
+   440→          ctx.strokeStyle = `${color}66`;
+   441→          ctx.lineWidth = r * 0.3;
+   442→          ctx.beginPath();
+   443→          ctx.arc(0, 0, r * 1.6, 0, Math.PI * 2);
+   444→          ctx.stroke();
+   445→          ctx.globalAlpha = alpha * 0.4;
+   446→          ctx.strokeStyle = `${color}33`;
+   447→          ctx.lineWidth = r * 0.14;
+   448→          ctx.beginPath();
+   449→          ctx.arc(0, 0, r * 1.92, 0, Math.PI * 2);
+   450→          ctx.stroke();
+   451→          ctx.restore();
+   452→          ctx.globalAlpha = 1;
+   453→        }
+   454→
+   455→        // the featured world carries a tiny rocket in a low orbit
+   456→        if (s.featured) {
+   457→          const ra = t * 1.5;
+   458→          const ro = r + 10 * sc + Math.sin(t * 2.2) * 2;
+   459→          const rx = p.x + Math.cos(ra) * ro;
+   460→          const ry2 = p.y + Math.sin(ra) * ro * 0.55;
+   461→          ctx.globalAlpha = 0.16;
+   462→          ctx.strokeStyle = "#ffc966";
+   463→          ctx.lineWidth = 0.8;
+   464→          ctx.beginPath();
+   465→          ctx.ellipse(p.x, p.y, ro, ro * 0.55, 0, 0, Math.PI * 2);
+   466→          ctx.stroke();
+   467→          ctx.globalAlpha = 0.5;
+   468→          ctx.strokeStyle = "#ffd9a8";
+   469→          ctx.lineWidth = 1.6;
+   470→          ctx.beginPath();
+   471→          ctx.ellipse(p.x, p.y, ro, ro * 0.55, 0, ra - 0.9, ra);
+   472→          ctx.stroke();
+   473→          ctx.globalAlpha = 1;
+   474→          ctx.save();
+   475→          ctx.translate(rx, ry2);
+   476→          ctx.rotate(ra + Math.PI / 2);
+   477→          ctx.fillStyle = "#f5efe6";
+   478→          ctx.beginPath();
+   479→          ctx.moveTo(0, -4.4 * sc);
+   480→          ctx.lineTo(2.5 * sc, 3 * sc);
+   481→          ctx.lineTo(-2.5 * sc, 3 * sc);
+   482→          ctx.closePath();
+   483→          ctx.fill();
+   484→          const fl = 3 + Math.sin(t * 30) * 1.6;
+   485→          const fg2 = ctx.createLinearGradient(0, 3 * sc, 0, (3 + fl) * sc);
+   486→          fg2.addColorStop(0, "rgba(255,190,110,0.95)");
+   487→          fg2.addColorStop(1, "rgba(255,90,30,0)");
+   488→          ctx.fillStyle = fg2;
+   489→          ctx.beginPath();
+   490→          ctx.moveTo(-1.4 * sc, 3 * sc);
+   491→          ctx.lineTo(1.4 * sc, 3 * sc);
+   492→          ctx.lineTo(0, (3 + fl) * sc);
+   493→          ctx.closePath();
+   494→          ctx.fill();
+   495→          ctx.restore();
+   496→        }
+   497→
+   498→        // capture ring for selected
+   499→        if (s === selectedRef.current) {
+   500→          ctx.strokeStyle = "rgba(255,190,120,0.9)";
+   501→          ctx.lineWidth = 1.2;
+   502→          ctx.setLineDash([4, 5]);
+   503→          ctx.lineDashOffset = -t * 22;
+   504→          ctx.beginPath();
+   505→          ctx.arc(p.x, p.y, r + 7 * sc, 0, Math.PI * 2);
+   506→          ctx.stroke();
+   507→          ctx.setLineDash([]);
+   508→        }
+   509→
+   510→        // defer the label — placed after all planets so depth sort of the
+   511→        // drawing never hides an active label behind a planet body
+   512→        labelJobs.push({ s, x: p.x, y: p.y - r - 9 * sc, priority: (isActive ? 100 : 0) + p.depth, active: isActive });
+   513→      };
+   514→
+   515→      // back planets first — they pass BEHIND the sun
+   516→      for (const o of order) if (o.p.depth < 0.5) drawPlanet(o);
+   517→
+   518→      // ── the sun: MESKAT CORE, drawn as a living star ──
+   519→      ctx.save();
+   520→      ctx.translate(cx, cy);
+   521→      ctx.rotate(t * 0.05);
+   522→      for (let i = 0; i < 14; i++) {
+   523→        const a = (i / 14) * Math.PI * 2;
+   524→        const len = pulse * (2.1 + (i % 3) * 0.5 + Math.sin(t * 1.7 + i) * 0.24);
+   525→        ctx.save();
+   526→        ctx.rotate(a);
+   527→        const rg = ctx.createLinearGradient(0, 0, len, 0);
+   528→        rg.addColorStop(0, "rgba(255,160,70,0.2)");
+   529→        rg.addColorStop(1, "rgba(255,120,40,0)");
+   530→        ctx.fillStyle = rg;
+   531→        ctx.beginPath();
+   532→        ctx.moveTo(pulse * 0.7, -2.2);
+   533→        ctx.lineTo(len, 0);
+   534→        ctx.lineTo(pulse * 0.7, 2.2);
+   535→        ctx.closePath();
+   536→        ctx.fill();
+   537→        ctx.restore();
+   538→      }
+   539→      ctx.restore();
+   540→
+   541→      const coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulse * 3.2);
+   542→      coreGlow.addColorStop(0, "rgba(255,150,70,0.5)");
+   543→      coreGlow.addColorStop(0.45, "rgba(255,110,45,0.14)");
+   544→      coreGlow.addColorStop(1, "rgba(255,90,30,0)");
+   545→      ctx.fillStyle = coreGlow;
+   546→      ctx.beginPath();
+   547→      ctx.arc(cx, cy, pulse * 3.2, 0, Math.PI * 2);
+   548→      ctx.fill();
+   549→
+   550→      const coreBody = ctx.createRadialGradient(cx - 6, cy - 6, 2, cx, cy, pulse);
+   551→      coreBody.addColorStop(0, "#fff3e2");
+   552→      coreBody.addColorStop(0.55, "#ff9d52");
+   553→      coreBody.addColorStop(1, "#c2481c");
+   554→      ctx.fillStyle = coreBody;
+   555→      ctx.beginPath();
+   556→      ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
+   557→      ctx.fill();
+   558→
+   559→      // horizontal flare streak across the star
+   560→      const flare = ctx.createLinearGradient(cx - pulse * 3.4, cy, cx + pulse * 3.4, cy);
+   561→      flare.addColorStop(0, "rgba(255,180,110,0)");
+   562→      flare.addColorStop(0.5, "rgba(255,214,150,0.2)");
+   563→      flare.addColorStop(1, "rgba(255,180,110,0)");
+   564→      ctx.fillStyle = flare;
+   565→      ctx.fillRect(cx - pulse * 3.4, cy - 1.1, pulse * 6.8, 2.2);
+   566→
+   567→      // rotating instrument halo around the core
+   568→      ctx.setLineDash([2, 6]);
+   569→      ctx.lineDashOffset = -t * 14;
+   570→      ctx.strokeStyle = "rgba(255,171,105,0.4)";
+   571→      ctx.lineWidth = 1;
+   572→      ctx.beginPath();
+   573→      ctx.arc(cx, cy, pulse + 12 * sc, 0, Math.PI * 2);
+   574→      ctx.stroke();
+   575→      ctx.setLineDash([]);
+   576→
+   577→      // ── front planets, then the front halves of the rings & belt ──
+   578→      for (const o of order) if (o.p.depth >= 0.5) drawPlanet(o);
+   579→      drawRings(true);
+   580→      drawBelt(true);
+   581→
+   582→      // ── collision-aware labels ─────────────────────────────
+   583→      // On small canvases 12 labels overlap into soup. Draw planets first,
+   584→      // then greedily place labels front-to-back; anything that would
+   585→      // intersect an already-placed label (or the core caption) is skipped.
+   586→      type Box = { x: number; y: number; w: number; h: number };
+   587→      const occupied: Box[] = [];
+   588→      const hits = (b: Box) =>
+   589→        occupied.some(
+   590→          (o) =>
+   591→            b.x - 4 < o.x + o.w && b.x + b.w + 4 > o.x && b.y - 3 < o.y + o.h && b.y + b.h + 3 > o.y
+   592→        );
+   593→
+   594→      ctx.textAlign = "center";
+   595→
+   596→      // MESKAT CORE — the caption is a designed plate now: flame-gradient
+   597→      // wordmark, breathing survey brackets and a live status subline
+   598→      const coreFs = Math.max(11, 13.5 * sc);
+   599→      const coreFont = `700 ${coreFs}px ${dispFam}`;
+   600→      ctx.font = coreFont;
+   601→      const spaced = "MESKAT CORE".split("").join("\u2009");
+   602→      const coreW = ctx.measureText(spaced).width;
+   603→      const coreY = cy + pulse + 24 * sc;
+   604→      occupied.push({
+   605→        x: cx - coreW / 2 - 14 * sc,
+   606→        y: coreY - coreFs - 3,
+   607→        w: coreW + 28 * sc,
+   608→        h: coreFs + 18 * sc,
+   609→      });
+   610→      const wordGrad = ctx.createLinearGradient(cx - coreW / 2, 0, cx + coreW / 2, 0);
+   611→      wordGrad.addColorStop(0, "#ffd9a8");
+   612→      wordGrad.addColorStop(0.5, "#ff8b3d");
+   613→      wordGrad.addColorStop(1, "#ff5e2b");
+   614→      ctx.save();
+   615→      ctx.font = coreFont;
+   616→      ctx.shadowColor = "rgba(255,139,61,0.55)";
+   617→      ctx.shadowBlur = 14;
+   618→      ctx.fillStyle = wordGrad;
+   619→      ctx.fillText(spaced, cx, coreY);
+   620→      ctx.restore();
+   621→
+   622→      // breathing survey brackets
+   623→      const bkw = coreW / 2 + 10 * sc;
+   624→      const breathe = Math.sin(t * 2) * 2.4 * sc;
+   625→      ctx.strokeStyle = "rgba(255,201,102,0.8)";
+   626→      ctx.lineWidth = 1.4;
+   627→      ctx.beginPath();
+   628→      ctx.moveTo(cx - bkw - 6 * sc - breathe, coreY - coreFs * 0.82);
+   629→      ctx.lineTo(cx - bkw - breathe, coreY - coreFs * 0.82);
+   630→      ctx.lineTo(cx - bkw - breathe, coreY + 4);
+   631→      ctx.stroke();
+   632→      ctx.beginPath();
+   633→      ctx.moveTo(cx + bkw + 6 * sc + breathe, coreY - coreFs * 0.82);
+   634→      ctx.lineTo(cx + bkw + breathe, coreY - coreFs * 0.82);
+   635→      ctx.lineTo(cx + bkw + breathe, coreY + 4);
+   636→      ctx.stroke();
+   637→
+   638→      // live status subline
+   639→      ctx.font = `500 ${Math.max(7.5, 8.4 * sc)}px ${dispFam}`;
+   640→      ctx.fillStyle = `rgba(201,188,174,${0.52 + 0.24 * Math.sin(t * 1.8)})`;
+   641→      ctx.fillText("SYSTEM ONLINE · 12 WORLDS · 60 FPS", cx, coreY + 14 * sc);
+   642→
+   643→      // greedy label placement: highest priority (active/selected, then
+   644→      // nearest) claims its spot first; the rest yield when crowded
+   645→      labelJobs.sort((a, b) => b.priority - a.priority);
+   646→      ctx.textAlign = "center";
+   647→      for (const job of labelJobs) {
+   648→        const fs = Math.max(10, (11 + (job.active ? 1.5 : 0)) * sc);
+   649→        ctx.font = `${job.active ? 700 : 500} ${fs}px ${dispFam}`;
+   650→        const w = ctx.measureText(job.s.name).width;
+   651→        const box: Box = { x: job.x - w / 2, y: job.y - fs, w, h: fs * 1.25 };
+   652→        // labels never leave the canvas
+   653→        if (box.x < 2 || box.x + box.w > cssW - 2) continue;
+   654→        if (!job.active && hits(box)) continue;
+   655→        occupied.push(box);
+   656→        ctx.globalAlpha = job.active ? 1 : 0.4 + 0.6 * Math.min(1, job.priority);
+   657→        ctx.font = `${job.active ? 700 : 500} ${fs}px ${dispFam}`;
+   658→        ctx.shadowColor = "rgba(5,3,8,0.9)";
+   659→        ctx.shadowBlur = 6;
+   660→        ctx.fillStyle = job.active ? "#ffe9d0" : "#c9bcae";
+   661→        ctx.fillText(job.s.name, job.x, job.y);
+   662→        ctx.shadowBlur = 0;
+   663→        ctx.globalAlpha = 1;
+   664→      }
+   665→    };
+   666→    draw();
+   667→
+   668→    return () => {
+   669→      cancelAnimationFrame(raf);
+   670→      ro.disconnect();
+   671→      canvas.removeEventListener("pointermove", onMove);
+   672→      canvas.removeEventListener("pointerdown", onDown);
+   673→      canvas.removeEventListener("pointerup", onUp);
+   674→      canvas.removeEventListener("pointerleave", onLeave);
+   675→    };
+   676→  }, []);
+   677→
+   678→  const shown = hovered ?? selected;
+   679→
+   680→  return (
+   681→    <section id="skills" className="relative px-5 sm:px-8 py-28 sm:py-36">
+   682→      <div className="mx-auto max-w-6xl">
+   683→        <motion.div
+   684→          initial={{ opacity: 0, y: 20 }}
+   685→          whileInView={{ opacity: 1, y: 0 }}
+   686→          viewport={{ once: true, margin: "-80px" }}
+   687→          transition={{ duration: 0.7 }}
+   688→        >
+   689→          <span className="stage-chip">
+   690→            <span className="chip-dot" />
+   691→            Stage 02 · Ascent
+   692→          </span>
+   693→        </motion.div>
+   694→
+   695→        <div className="mt-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
+   696→          <motion.h2
+   697→            initial={{ opacity: 0, y: 30 }}
+   698→            whileInView={{ opacity: 1, y: 0 }}
+   699→            viewport={{ once: true, margin: "-80px" }}
+   700→            transition={{ duration: 0.8 }}
+   701→            className="font-[family-name:var(--font-display)] font-bold leading-[1.05] text-[clamp(30px,5vw,52px)]"
+   702→          >
+   703→            The skill
+   704→            <span className="flame-text"> solar system.</span>
+   705→          </motion.h2>
+   706→          <motion.p
+   707→            initial={{ opacity: 0 }}
+   708→            whileInView={{ opacity: 1 }}
+   709→            viewport={{ once: true }}
+   710→            transition={{ delay: 0.15, duration: 0.8 }}
+   711→            className="flex items-center gap-2 text-[13px] text-[#a99b8e] font-[family-name:var(--font-display)] tracking-wide"
+   712→          >
+   713→            <Hand size={14} className="hidden sm:block" aria-hidden />
+   714→            <MousePointer2 size={14} className="sm:hidden" aria-hidden />
+   715→            Drag to spin the system · tap a planet to open its file
+   716→          </motion.p>
+   717→        </div>
+   718→
+   719→        <div className="mt-12 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)] gap-10 items-center">
+   720→          {/* the system — min-w-0: the canvas' intrinsic size must never be
+   721→              allowed to widen the grid track on small/desktop-mode screens */}
+   722→          <motion.div
+   723→            initial={{ opacity: 0, scale: 0.94 }}
+   724→            whileInView={{ opacity: 1, scale: 1 }}
+   725→            viewport={{ once: true, margin: "-100px" }}
+   726→            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+   727→            ref={wrapRef}
+   728→            className="relative mx-auto w-full min-w-0 max-w-[720px] aspect-square"
+   729→          >
+   730→            {/* soft space bubble so the 3D rocket behind never fights the system */}
+   731→            <div
+   732→              aria-hidden
+   733→              className="absolute inset-0 rounded-full"
+   734→              style={{
+   735→                background:
+   736→                  "radial-gradient(circle at 50% 50%, rgba(8,6,10,0.9) 0%, rgba(8,6,10,0.74) 55%, rgba(8,6,10,0) 74%)",
+   737→              }}
+   738→            />
+   739→            <canvas
+   740→              ref={canvasRef}
+   741→              className="relative z-10 w-full h-full block"
+   742→              aria-label="Interactive solar system map of Meskat's skills"
+   743→              role="img"
+   744→            />
+   745→          </motion.div>
+   746→
+   747→          {/* info panel */}
+   748→          <motion.div
+   749→            initial={{ opacity: 0, y: 30 }}
+   750→            whileInView={{ opacity: 1, y: 0 }}
+   751→            viewport={{ once: true, margin: "-80px" }}
+   752→            transition={{ duration: 0.8, delay: 0.1 }}
+   753→            className="rounded-[28px] glass p-6 sm:p-8 min-h-[240px] sm:min-h-[280px] w-full max-w-full min-w-0 flex flex-col overflow-hidden"
+   754→            style={{ background: "rgba(12,8,14,0.55)" }}
+   755→          >
+   756→            <div className="flex items-center justify-between">
+   757→              <span
+   758→                className="text-[10px] tracking-[0.3em] uppercase font-[family-name:var(--font-display)] px-3 py-1.5 rounded-full border"
+   759→                style={{ color: CATEGORY_COLOR[shown.category], borderColor: `${CATEGORY_COLOR[shown.category]}44` }}
+   760→              >
+   761→                {shown.category} system
+   762→              </span>
+   763→              <span className="text-[11px] text-[#a99b8e] tabular-nums tracking-widest">
+   764→                {String(SKILLS.indexOf(shown) + 1).padStart(2, "0")} / {SKILLS.length}
+   765→              </span>
+   766→            </div>
+   767→
+   768→            {shown.featured && (
+   769→              <div className="mt-4 flex items-center gap-2 rounded-2xl border border-[#ffc9663c] bg-[#ffc9660d] px-3.5 py-2">
+   770→                <span className="relative flex h-2 w-2">
+   771→                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#ffc966] opacity-70" />
+   772→                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[#ffc966]" />
+   773→                </span>
+   774→                <span className="text-[10px] tracking-[0.26em] uppercase font-[family-name:var(--font-display)] text-[#ffc966]">
+   775→                  This website · you are inside the demo
+   776→                </span>
+   777→              </div>
+   778→ )}
+   779→
+   780→            <h3 className="mt-5 font-[family-name:var(--font-display)] font-bold text-[26px] text-[#f5efe6]">
+   781→              {shown.name}
+   782→            </h3>
+   783→
+   784→            <div className="mt-4">
+   785→              <div className="flex justify-between text-[11px] text-[#a99b8e] tracking-wider mb-2">
+   786→                <span>{shown.featured ? "RENDER STABILITY · 60 FPS" : "ORBIT STABILITY"}</span>
+   787→                <span className="tabular-nums">{shown.level}%</span>
+   788→              </div>
+   789→              <div className="h-2 rounded-full bg-white/8 overflow-hidden">
+   790→                <motion.div
+   791→                  key={shown.name}
+   792→                  initial={{ width: 0 }}
+   793→                  animate={{ width: `${shown.level}%` }}
+   794→                  transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+   795→                  className="h-full rounded-full"
+   796→                  style={{ background: `linear-gradient(90deg, ${CATEGORY_COLOR[shown.category]}66, ${CATEGORY_COLOR[shown.category]})` }}
+   797→                />
+   798→              </div>
+   799→            </div>
+   800→
+   801→            <p className="mt-5 text-[14px] leading-relaxed text-[#c9bcae] break-words">{shown.blurb}</p>
+   802→
+   803→            {shown.featured && (
+   804→              <p className="mt-4 pl-4 border-l-2 border-[#ff8b3d66] text-[12.5px] italic leading-relaxed text-[#a99b8e]">
+   805→                {shown.detail}
+   806→              </p>
+   807→ )}
+   808→          </motion.div>
+   809→        </div>
+   810→      </div>
+   811→
+   812→      {/* expanded planet dossier — opens on planet click */}
+   813→      <AnimatePresence>
+   814→        {expanded && (
+   815→          <motion.div
+   816→            key="dossier-backdrop"
+   817→            initial={{ opacity: 0 }}
+   818→            animate={{ opacity: 1 }}
+   819→            exit={{ opacity: 0 }}
+   820→            transition={{ duration: 0.25 }}
+   821→            className="fixed inset-0 z-[85] flex items-center justify-center"
+   822→            style={{
+   823→              background: "rgba(4,2,7,0.62)",
+   824→              backdropFilter: "blur(14px)",
+   825→              padding: "clamp(16px, 5vw, 32px)",
+   826→            }}
+   827→            onClick={() => setExpanded(null)}
+   828→            role="dialog"
+   829→            aria-modal="true"
+   830→            aria-label={`${expanded.name} — skill dossier`}
+   831→          >
+   832→            <motion.div
+   833→              key="dossier-card"
+   834→              initial={{ opacity: 0, scale: 0.86, y: 26 }}
+   835→              animate={{ opacity: 1, scale: 1, y: 0 }}
+   836→              exit={{ opacity: 0, scale: 0.9, y: 18 }}
+   837→              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+   838→              onClick={(e) => e.stopPropagation()}
+   839→              className="relative w-full max-w-[520px] rounded-[32px] glass overflow-hidden"
+   840→              style={{
+   841→                boxShadow: `0 40px 120px -30px ${CATEGORY_COLOR[expanded.category]}55`,
+   842→                padding: "clamp(22px, 4.5vw, 36px)",
+   843→                maxHeight: "86dvh",
+   844→                overflowY: "auto",
+   845→              }}
+   846→            >
+   847→              {/* category glow wash */}
+   848→              <div
+   849→                aria-hidden
+   850→                className="absolute -top-24 -right-24 w-72 h-72 rounded-full pointer-events-none"
+   851→                style={{ background: `radial-gradient(circle, ${CATEGORY_COLOR[expanded.category]}2e, transparent 70%)` }}
+   852→              />
+   853→
+   854→              <button
+   855→                onClick={() => setExpanded(null)}
+   856→                aria-label="Close dossier"
+   857→                className="absolute top-5 right-5 w-10 h-10 rounded-full grid place-items-center border border-white/15 text-[#c9bcae] hover:text-[#f5efe6] hover:border-[#ff8b3d66] transition-colors"
+   858→              >
+   859→                <X size={17} />
+   860→              </button>
+   861→
+   862→              <div className="flex items-center gap-2.5 text-[10px] tracking-[0.3em] uppercase font-[family-name:var(--font-display)] text-[#a99b8e]">
+   863→                <Orbit size={13} className="text-[#ff8b3d]" aria-hidden />
+   864→                Skill dossier · {String(SKILLS.indexOf(expanded) + 1).padStart(2, "0")} / {SKILLS.length}
+   865→              </div>
+   866→
+   867→              <div className="mt-6 flex items-center gap-5">
+   868→                {/* the planet, pulled out of orbit */}
+   869→                <motion.span
+   870→                  initial={{ scale: 0.4, rotate: -20 }}
+   871→                  animate={{ scale: 1, rotate: 0 }}
+   872→                  transition={{ delay: 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+   873→                  aria-hidden
+   874→                  className="shrink-0 w-16 h-16 rounded-full"
+   875→                  style={{
+   876→                    background: `radial-gradient(circle at 32% 30%, #fff6ea 0%, ${CATEGORY_COLOR[expanded.category]} 46%, #20140c 100%)`,
+   877→                    boxShadow: `0 0 34px ${CATEGORY_COLOR[expanded.category]}66, inset -6px -8px 16px rgba(0,0,0,0.55)`,
+   878→                  }}
+   879→                />
+   880→                <div>
+   881→                  {expanded.featured && (
+   882→                    <span className="mb-2 inline-flex items-center gap-1.5 text-[9.5px] tracking-[0.24em] uppercase font-[family-name:var(--font-display)] text-[#ffc966]">
+   883→                      <span className="w-1.5 h-1.5 rounded-full bg-[#ffc966] animate-pulse inline-block" aria-hidden />
+   884→                      this website · live demo
+   885→                    </span>
+   886→                  )}
+   887→                  <h3 className="font-[family-name:var(--font-display)] font-bold text-[clamp(24px,5vw,34px)] leading-tight text-[#f5efe6]">
+   888→                    {expanded.name}
+   889→                  </h3>
+   890→                  <span
+   891→                    className="mt-1.5 inline-block text-[10px] tracking-[0.28em] uppercase font-[family-name:var(--font-display)] px-3 py-1 rounded-full border"
+   892→                    style={{ color: CATEGORY_COLOR[expanded.category], borderColor: `${CATEGORY_COLOR[expanded.category]}44` }}
+   893→                  >
+   894→                    {expanded.category} system · ring {expanded.ring + 1}
+   895→                  </span>
+   896→                </div>
+   897→              </div>
+   898→
+   899→              <p className="mt-6 text-[14.5px] leading-relaxed text-[#c9bcae]">{expanded.blurb}</p>
+   900→
+   901→              <div className="mt-4 pl-5 border-l-2 text-[13.5px] italic leading-relaxed text-[#a99b8e]" style={{ borderColor: `${CATEGORY_COLOR[expanded.category]}66` }}>
+   902→                {expanded.detail}
+   903→              </div>
+   904→
+   905→              <div className="mt-7">
+   906→                <div className="flex justify-between text-[11px] text-[#a99b8e] tracking-wider mb-2">
+   907→                  <span>ORBIT STABILITY</span>
+   908→                  <span className="tabular-nums">{expanded.level}%</span>
+   909→                </div>
+   910→                <div className="h-2 rounded-full bg-white/8 overflow-hidden">
+   911→                  <motion.div
+   912→                    initial={{ width: 0 }}
+   913→                    animate={{ width: `${expanded.level}%` }}
+   914→                    transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+   915→                    className="h-full rounded-full"
+   916→                    style={{ background: `linear-gradient(90deg, ${CATEGORY_COLOR[expanded.category]}66, ${CATEGORY_COLOR[expanded.category]})` }}
+   917→                  />
+   918→                </div>
+   919→              </div>
+   920→            </motion.div>
+   921→          </motion.div>
+   922→        )}
+   923→      </AnimatePresence>
+   924→    </section>
+   925→  );
+   926→}
+   927→

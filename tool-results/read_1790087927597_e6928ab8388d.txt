@@ -1,0 +1,1030 @@
+     1→"use client";
+     2→
+     3→import { useEffect, useRef, useState } from "react";
+     4→import { motion, AnimatePresence } from "framer-motion";
+     5→import { MousePointer2, Hand, X, Orbit } from "lucide-react";
+     6→
+     7→interface Skill {
+     8→  name: string;
+     9→  category: "Core" | "Visual" | "Mind" | "Tools";
+    10→  level: number;
+    11→  blurb: string;
+    12→  detail: string;
+    13→  ring: 0 | 1 | 2;
+    14→  angle: number;
+    15→  featured?: boolean; // the skill that IS this website
+    16→}
+    17→
+    18→const CATEGORY_COLOR: Record<Skill["category"], string> = {
+    19→  Core: "#ff8b3d",
+    20→  Visual: "#ffc966",
+    21→  Mind: "#ff5e2b",
+    22→  Tools: "#e8d5c0",
+    23→};
+    24→
+    25→const SKILLS: Skill[] = [
+    26→  { name: "JavaScript", category: "Core", level: 95, featured: true, blurb: "No framework. No game engine. No template. The rocket that just ignited behind this panel is plain JavaScript — you are not reading my portfolio, you are flying it.", detail: "Flight log: scroll and the strongback swings clear at T-0, the plume flashes shock diamonds, the pad falls away into a persistent exhaust pillar — then Earth's limb, a space station, satellites, VERMILION → AURELIA → GLACIUS. 60fps. On your phone. Right now. That is the demo.", ring: 0, angle: 0.3 },
+    27→  { name: "React", category: "Core", level: 88, blurb: "A precision instrument for managing complexity at scale — correct boundaries, deliberate data flow, predictable renders.", detail: "Flight log: used for adaptive timers, dashboard UIs and this portfolio. I care about where state lives, when a component re-renders, and keeping the tree calm instead of churning.", ring: 0, angle: 2.6 },
+    28→  { name: "Canvas API", category: "Visual", level: 93, blurb: "Real-time annotation systems, particle physics and custom rendering pipelines — 60fps, zero dependencies.", detail: "Flight log: my home turf. Laser-pointer trails with verlet physics, freehand ink smoothing, layer compositing and hit-testing — all hand-rolled on a single 2D context.", ring: 0, angle: 4.6 },
+    29→  { name: "HTML / CSS", category: "Visual", level: 92, blurb: "Interfaces that respond gracefully on every viewport, with animation systems that feel physically accurate.", detail: "Flight log: fluid type scales, backdrop glass, scroll choreography and layouts that survive a 320px phone without a single horizontal jiggle. The boring layer, done obsessively.", ring: 1, angle: 1.2 },
+    30→  { name: "Three.js / WebGL", category: "Visual", level: 80, blurb: "Immersive 3D scenes — orbital mechanics, terrain meshes and shader experiments with an engineer's rigour.", detail: "Flight log: built the live launch sequence behind this page — procedural vehicles, particle exhaust, shader atmosphere rims and post-processing bloom, tuned to hold 60fps.", ring: 1, angle: 2.9 },
+    31→  { name: "UI / UX Design", category: "Visual", level: 82, blurb: "Visual hierarchy and spatial rhythm — interfaces that feel intuitive on first contact and disappear into the task.", detail: "Flight log: I sketch motion before pixels — timing curves, easing, where attention lands first. Good UX is the tool the user never notices using.", ring: 1, angle: 4.4 },
+    32→  { name: "Physics", category: "Mind", level: 90, blurb: "Not a subject — a lens. Mechanics, electromagnetism and waves, translated directly into computational models.", detail: "Flight log: projectile arcs in a laser game, elastic collisions in ink, gravity in scroll scenes. Every simulation on this site is grounded in real equations, not faked easing.", ring: 1, angle: 5.7 },
+    33→  { name: "Mathematics", category: "Mind", level: 88, blurb: "Linear algebra to differential equations — fluency that makes code correct by construction, not by trial.", detail: "Flight log: rotation matrices for pseudo-3D orbit rings, numeric integration for particle systems, easing derivations. Math first means less debugging later.", ring: 2, angle: 0.8 },
+    34→  { name: "Physics Simulation", category: "Mind", level: 86, blurb: "Real-time orbital mechanics, fluid approximations and elastic collisions, grounded in actual physical law.", detail: "Flight log: semi-implicit Euler at it again — smoke that billows because buoyancy says so, sparks with real drag. Plausible motion is the cheapest special effect there is.", ring: 2, angle: 2.0 },
+    35→  { name: "Problem Solving", category: "Mind", level: 93, blurb: "Decomposing the impossible into the merely difficult — then shipping the answer.", detail: "Flight log: the launch sequence behind you needed 40 small inventions before it ran at 60fps on a phone. I don't skip hard problems — I slice them.", ring: 2, angle: 3.4 },
+    36→  { name: "Git & GitHub", category: "Tools", level: 85, blurb: "Disciplined version control — atomic commits and history that reads like documentation.", detail: "Flight log: feature branches, meaningful messages, and a history you can bisect. My repos read like mission logs, not a graveyard of 'final_v2_REAL'.", ring: 2, angle: 4.5 },
+    37→  { name: "Python", category: "Tools", level: 75, blurb: "Scripting, tooling and gluing systems together when the browser isn't the whole story.", detail: "Flight log: texture generators, data wrangling, small automations that pre-compute what the browser would choke on. The quiet support crew of every launch.", ring: 2, angle: 5.6 },
+    38→];
+    39→
+    40→const RING_RADIUS = [126, 196, 264];
+    41→const RING_SPEED = [0.34, 0.21, 0.13];
+    42→
+    43→export default function SkillOrbit() {
+    44→  const canvasRef = useRef<HTMLCanvasElement>(null);
+    45→  const wrapRef = useRef<HTMLDivElement>(null);
+    46→  const zoomRef = useRef<HTMLDivElement>(null);
+    47→  const veilRef = useRef<HTMLDivElement>(null);
+    48→  const hintRef = useRef<HTMLDivElement>(null);
+    49→  const headerRef = useRef<HTMLDivElement>(null);
+    50→  const panelRef = useRef<HTMLDivElement>(null);
+    51→  const [selected, setSelected] = useState<Skill>(SKILLS[0]);
+    52→  const [hovered, setHovered] = useState<Skill | null>(null);
+    53→  const [expanded, setExpanded] = useState<Skill | null>(null);
+    54→  const selectedRef = useRef<Skill>(SKILLS[0]);
+    55→
+    56→  useEffect(() => {
+    57→    selectedRef.current = selected;
+    58→  }, [selected]);
+    59→
+    60→  // lock scroll + ESC to close while the dossier is open
+    61→  useEffect(() => {
+    62→    if (!expanded) return;
+    63→    document.body.classList.add("locked");
+    64→    const onKey = (e: KeyboardEvent) => {
+    65→      if (e.key === "Escape") setExpanded(null);
+    66→    };
+    67→    window.addEventListener("keydown", onKey);
+    68→    return () => {
+    69→      document.body.classList.remove("locked");
+    70→      window.removeEventListener("keydown", onKey);
+    71→    };
+    72→  }, [expanded]);
+    73→
+    74→  useEffect(() => {
+    75→    const canvas = canvasRef.current!;
+    76→    const wrap = wrapRef.current!;
+    77→    const ctx = canvas.getContext("2d")!;
+    78→    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    79→    const dispFam =
+    80→      getComputedStyle(document.documentElement).getPropertyValue("--font-display").trim() ||
+    81→      "sans-serif";
+    82→
+    83→    let cssW = wrap.clientWidth;
+    84→    let cssH = cssW;
+    85→    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    86→
+    87→    const resize = () => {
+    88→      cssW = wrap.clientWidth;
+    89→      cssH = cssW;
+    90→      canvas.width = cssW * dpr;
+    91→      canvas.height = cssH * dpr;
+    92→      canvas.style.width = `${cssW}px`;
+    93→      canvas.style.height = `${cssH}px`;
+    94→    };
+    95→    resize();
+    96→    const ro = new ResizeObserver(resize);
+    97→    ro.observe(wrap);
+    98→
+    99→    // world scale factor relative to design size 640
+   100→    const S = () => cssW / 640;
+   101→
+   102→    // interaction state
+   103→    let hoverIdx = -1;
+   104→    let dragOffset = 0;
+   105→    let dragVel = 0;
+   106→    let dragging = false;
+   107→    let lastX = 0;
+   108→    let tiltX = 0; // extra tilt from pointer
+   109→    const starPositions = Array.from({ length: 70 }, () => ({
+   110→      x: Math.random(),
+   111→      y: Math.random(),
+   112→      r: 0.4 + Math.random() * 1.1,
+   113→      tw: Math.random() * Math.PI * 2,
+   114→    }));
+   115→
+   116→    // ── realism kit: procedural planet surfaces, an asteroid belt, a
+   117→    //    passing comet and a ring system on the WebGL world ──
+   118→    const shadeHex = (hex: string, amt: number) => {
+   119→      const n = parseInt(hex.slice(1), 16);
+   120→      const ch = (v: number) => Math.min(255, Math.max(0, Math.round(v)));
+   121→      const r = ch(((n >> 16) & 255) * (1 + amt));
+   122→      const g = ch(((n >> 8) & 255) * (1 + amt));
+   123→      const b = ch((n & 255) * (1 + amt));
+   124→      return `rgb(${r},${g},${b})`;
+   125→    };
+   126→    const planetTexCache = new Map<number, HTMLCanvasElement>();
+   127→    const planetTex = (i: number): HTMLCanvasElement => {
+   128→      const hit = planetTexCache.get(i);
+   129→      if (hit) return hit;
+   130→      const size = 96;
+   131→      const cv = document.createElement("canvas");
+   132→      cv.width = cv.height = size;
+   133→      const g = cv.getContext("2d")!;
+   134→      const base = CATEGORY_COLOR[SKILLS[i].category];
+   135→      g.fillStyle = base;
+   136→      g.fillRect(0, 0, size, size);
+   137→      let seed = i * 9973 + 17;
+   138→      const rnd = () => {
+   139→        seed = (seed * 16807) % 2147483647;
+   140→        return seed / 2147483647;
+   141→      };
+   142→      const shades = [shadeHex(base, -0.42), shadeHex(base, -0.2), shadeHex(base, 0.16), shadeHex(base, 0.32)];
+   143→      for (let k = 0; k < 46; k++) {
+   144→        const x = rnd() * size;
+   145→        const y = rnd() * size;
+   146→        const r = 3 + rnd() * 12;
+   147→        g.fillStyle = shades[Math.floor(rnd() * shades.length)];
+   148→        g.globalAlpha = 0.15 + rnd() * 0.22;
+   149→        g.beginPath();
+   150→        if (rnd() > 0.6) g.ellipse(x, y, r * (1 + rnd()), r * 0.55, rnd() * Math.PI, 0, Math.PI * 2);
+   151→        else g.arc(x, y, r, 0, Math.PI * 2);
+   152→        g.fill();
+   153→      }
+   154→      g.globalAlpha = 1;
+   155→      planetTexCache.set(i, cv);
+   156→      return cv;
+   157→    };
+   158→    const RINGED = new Set<number>([SKILLS.findIndex((s) => s.name.startsWith("Three"))]);
+   159→    // the top-tier worlds carry a small moon — hierarchy you can feel
+   160→    const MOONED = new Set<number>([
+   161→      SKILLS.findIndex((s) => s.name === "JavaScript"),
+   162→      SKILLS.findIndex((s) => s.name === "Canvas API"),
+   163→      SKILLS.findIndex((s) => s.name === "Problem Solving"),
+   164→    ]);
+   165→    const belt = Array.from({ length: 88 }, () => ({
+   166→      a0: Math.random() * Math.PI * 2,
+   167→      rr: 0.94 + Math.random() * 0.12,
+   168→      r: 0.5 + Math.random() * 1.1,
+   169→      speed: 0.05 + Math.random() * 0.05,
+   170→      c: Math.random() > 0.5 ? "#8a7d72" : "#6f6459",
+   171→    }));
+   172→    const comet = { active: false, t0: 0, next: 4, x0: 0, y0: 0, x1: 0, y1: 0 };
+   173→
+   174→    const orbPos = (s: Skill, t: number) => {
+   175→      const a = s.angle + t * RING_SPEED[s.ring] + dragOffset;
+   176→      const r = RING_RADIUS[s.ring] * S();
+   177→      const z = Math.sin(a); // depth -1..1
+   178→      return {
+   179→        x: cssW / 2 + Math.cos(a) * r,
+   180→        y: cssH / 2 + z * r * 0.4 + tiltX * r * 0.08,
+   181→        depth: (z + 1) / 2, // 0 back → 1 front
+   182→      };
+   183→    };
+   184→
+   185→    const pick = (mx: number, my: number, t: number): number => {
+   186→      let best = -1;
+   187→      let bestD = 26;
+   188→      SKILLS.forEach((s, i) => {
+   189→        const p = orbPos(s, t);
+   190→        const scale = 0.72 + p.depth * 0.55;
+   191→        const rr = (10 + (s.level / 100) * 9) * scale * S() + 12;
+   192→        const d = Math.hypot(mx - p.x, my - p.y);
+   193→        if (d < Math.max(rr, 24) && d < bestD + 12) {
+   194→          bestD = d;
+   195→          best = i;
+   196→        }
+   197→      });
+   198→      return best;
+   199→    };
+   200→
+   201→    const onMove = (e: PointerEvent) => {
+   202→      const rect = canvas.getBoundingClientRect();
+   203→      const vs = rect.width / Math.max(1, cssW);
+   204→      const mx = (e.clientX - rect.left) / vs;
+   205→      const my = (e.clientY - rect.top) / vs;
+   206→      if (dragging) {
+   207→        const dx = e.clientX - lastX;
+   208→        lastX = e.clientX;
+   209→        dragOffset += dx * 0.006;
+   210→        dragVel = dx * 0.006;
+   211→        return;
+   212→      }
+   213→      const t = performance.now() / 1000;
+   214→      hoverIdx = pick(mx, my, t);
+   215→      setHovered(hoverIdx >= 0 ? SKILLS[hoverIdx] : null);
+   216→      // gentle tilt toward pointer
+   217→      const ny = (my / cssH - 0.5) * 2;
+   218→      tiltX += ((-ny * 1.2) - tiltX) * 0.08;
+   219→    };
+   220→
+   221→    const onDown = (e: PointerEvent) => {
+   222→      const rect = canvas.getBoundingClientRect();
+   223→      const vs = rect.width / Math.max(1, cssW);
+   224→      const mx = (e.clientX - rect.left) / vs;
+   225→      const my = (e.clientY - rect.top) / vs;
+   226→      const t = performance.now() / 1000;
+   227→      const hit = pick(mx, my, t);
+   228→      if (hit >= 0) {
+   229→        setSelected(SKILLS[hit]);
+   230→        setExpanded(SKILLS[hit]); // open the full dossier
+   231→        return;
+   232→      }
+   233→      dragging = true;
+   234→      lastX = e.clientX;
+   235→      canvas.setPointerCapture(e.pointerId);
+   236→    };
+   237→
+   238→    const onUp = () => {
+   239→      dragging = false;
+   240→    };
+   241→
+   242→    const onLeave = () => {
+   243→      hoverIdx = -1;
+   244→      setHovered(null);
+   245→    };
+   246→
+   247→    canvas.addEventListener("pointermove", onMove);
+   248→    canvas.addEventListener("pointerdown", onDown);
+   249→    canvas.addEventListener("pointerup", onUp);
+   250→    canvas.addEventListener("pointerleave", onLeave);
+   251→    canvas.style.touchAction = "pan-y";
+   252→
+   253→    let raf = 0;
+   254→    const draw = () => {
+   255→      raf = requestAnimationFrame(draw);
+   256→      const t = performance.now() / 1000;
+   257→      if (!dragging) {
+   258→        dragOffset += dragVel;
+   259→        dragVel *= 0.94;
+   260→        if (!reduced) dragOffset += 0.0016; // slow auto-rotate
+   261→      }
+   262→
+   263→      // ── scroll-driven fullscreen zoom: the closer the system's center
+   264→      //    drifts to the viewport's center, the harder it swells — until
+   265→      //    it fills the whole screen — then it docks back down as you
+   266→      //    scroll past. transform-only, so layout never jumps. ──
+   267→      const rect = canvas.getBoundingClientRect();
+   268→      const vw = window.innerWidth;
+   269→      const vh = window.innerHeight;
+   270→      const dist = Math.hypot(
+   271→        rect.left + rect.width / 2 - vw / 2,
+   272→        rect.top + rect.height / 2 - vh / 2
+   273→      );
+   274→      let zoom = Math.max(0, 1 - dist / (vh * 0.74));
+   275→      zoom = zoom * zoom * (3 - 2 * zoom); // smoothstep
+   276→      const cover = Math.max(vw, vh) / Math.max(1, cssW);
+   277→      const zScale = 1 + zoom * (Math.min(cover, 2.7) - 1);
+   278→      if (zoomRef.current) {
+   279→        zoomRef.current.style.transform = zScale > 1.0008 ? `scale(${zScale.toFixed(4)})` : "";
+   280→      }
+   281→      if (wrapRef.current) {
+   282→        wrapRef.current.style.zIndex = zoom > 0.42 ? "45" : "";
+   283→      }
+   284→      if (veilRef.current) {
+   285→        veilRef.current.style.opacity = (zoom * 0.94).toFixed(3);
+   286→      }
+   287→      const uiFade = Math.max(0, 1 - zoom * 1.9);
+   288→      if (headerRef.current) headerRef.current.style.opacity = uiFade.toFixed(3);
+   289→      if (panelRef.current) panelRef.current.style.opacity = uiFade.toFixed(3);
+   290→      if (hintRef.current) {
+   291→        hintRef.current.style.opacity = Math.min(1, Math.max(0, (zoom - 0.55) / 0.4)).toFixed(3);
+   292→      }
+   293→
+   294→      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+   295→      ctx.clearRect(0, 0, cssW, cssH);
+   296→
+   297→      const cx = cssW / 2;
+   298→      const cy = cssH / 2;
+   299→      const sc = S();
+   300→
+   301→      // backdrop: two faint nebula washes, then the starfield
+   302→      const nebA = ctx.createRadialGradient(cssW * 0.18, cssH * 0.24, 0, cssW * 0.18, cssH * 0.24, cssW * 0.4);
+   303→      nebA.addColorStop(0, "rgba(255,120,60,0.05)");
+   304→      nebA.addColorStop(1, "rgba(255,120,60,0)");
+   305→      ctx.fillStyle = nebA;
+   306→      ctx.fillRect(0, 0, cssW, cssH);
+   307→      const nebB = ctx.createRadialGradient(cssW * 0.82, cssH * 0.78, 0, cssW * 0.82, cssH * 0.78, cssW * 0.42);
+   308→      nebB.addColorStop(0, "rgba(140,100,255,0.05)");
+   309→      nebB.addColorStop(1, "rgba(140,100,255,0)");
+   310→      ctx.fillStyle = nebB;
+   311→      ctx.fillRect(0, 0, cssW, cssH);
+   312→
+   313→      for (const st of starPositions) {
+   314→        const tw = 0.35 + 0.3 * Math.sin(t * 1.4 + st.tw);
+   315→        ctx.globalAlpha = tw;
+   316→        ctx.fillStyle = "#e8d5c0";
+   317→        ctx.beginPath();
+   318→        ctx.arc(st.x * cssW, st.y * cssH, st.r * sc, 0, Math.PI * 2);
+   319→        ctx.fill();
+   320→      }
+   321→      ctx.globalAlpha = 1;
+   322→
+   323→      const pulse = 30 + Math.sin(t * 2.2) * 2.5;
+   324→
+   325→      // asteroid belt between ring 0 and ring 1 — drawn in two halves so
+   326→      // the system reads as genuinely three-dimensional
+   327→      const beltR = ((RING_RADIUS[0] + RING_RADIUS[1]) / 2) * sc;
+   328→      const drawBelt = (front: boolean) => {
+   329→        for (const a of belt) {
+   330→          const ang = a.a0 + t * a.speed + dragOffset * 0.9;
+   331→          const z = Math.sin(ang);
+   332→          if (front !== z > 0) continue;
+   333→          const bx2 = cx + Math.cos(ang) * beltR * a.rr;
+   334→          const by2 = cy + z * beltR * a.rr * 0.4 + tiltX * beltR * a.rr * 0.08;
+   335→          const dep = (z + 1) / 2;
+   336→          ctx.globalAlpha = (front ? 0.5 : 0.2) * (0.35 + dep * 0.65);
+   337→          ctx.fillStyle = a.c;
+   338→          ctx.beginPath();
+   339→          ctx.arc(bx2, by2, a.r * sc * (0.6 + dep * 0.7), 0, Math.PI * 2);
+   340→          ctx.fill();
+   341→        }
+   342→        ctx.globalAlpha = 1;
+   343→      };
+   344→
+   345→      // orbit rings, depth-aware: back halves now (dim), front after planets
+   346→      const drawRings = (front: boolean) => {
+   347→        RING_RADIUS.forEach((r, i) => {
+   348→          ctx.beginPath();
+   349→          ctx.ellipse(
+   350→            cx,
+   351→            cy + tiltX * r * sc * 0.08,
+   352→            r * sc,
+   353→            r * sc * 0.4,
+   354→            0,
+   355→            front ? 0 : Math.PI,
+   356→            front ? Math.PI : Math.PI * 2
+   357→          );
+   358→          ctx.strokeStyle = `rgba(255,171,105,${(front ? 0.22 : 0.1) + (hoverIdx >= 0 ? 0.04 : 0)})`;
+   359→          ctx.lineWidth = front ? 1.1 : 0.9;
+   360→          ctx.setLineDash(i === 2 && front ? [3, 7] : []);
+   361→          ctx.stroke();
+   362→          ctx.setLineDash([]);
+   363→        });
+   364→      };
+   365→
+   366→      // a comet grazes the system every so often — pure punctuation
+   367→      if (comet.active) {
+   368→        const q = (t - comet.t0) / 2.8;
+   369→        if (q >= 1) comet.active = false;
+   370→        else {
+   371→          const fx = comet.x0 + (comet.x1 - comet.x0) * q;
+   372→          const fy = comet.y0 + (comet.y1 - comet.y0) * q + Math.sin(q * Math.PI) * -24;
+   373→          const hx = comet.x0 + (comet.x1 - comet.x0) * Math.max(0, q - 0.3);
+   374→          const hy = comet.y0 + (comet.y1 - comet.y0) * Math.max(0, q - 0.3);
+   375→          const tail = ctx.createLinearGradient(fx, fy, hx, hy);
+   376→          tail.addColorStop(0, "rgba(255,230,200,0.8)");
+   377→          tail.addColorStop(1, "rgba(255,160,90,0)");
+   378→          ctx.strokeStyle = tail;
+   379→          ctx.lineWidth = 2;
+   380→          ctx.beginPath();
+   381→          ctx.moveTo(fx, fy);
+   382→          ctx.lineTo(hx, hy);
+   383→          ctx.stroke();
+   384→          const hg = ctx.createRadialGradient(fx, fy, 0, fx, fy, 10 * sc);
+   385→          hg.addColorStop(0, "rgba(255,244,224,0.95)");
+   386→          hg.addColorStop(1, "rgba(255,180,90,0)");
+   387→          ctx.fillStyle = hg;
+   388→          ctx.beginPath();
+   389→          ctx.arc(fx, fy, 10 * sc, 0, Math.PI * 2);
+   390→          ctx.fill();
+   391→        }
+   392→      } else if (t > comet.next) {
+   393→        comet.active = true;
+   394→        comet.t0 = t;
+   395→        comet.next = t + 9 + Math.random() * 7;
+   396→        const leftFirst = Math.random() > 0.5;
+   397→        comet.x0 = leftFirst ? -20 : cssW + 20;
+   398→        comet.y0 = cssH * (0.1 + Math.random() * 0.3);
+   399→        comet.x1 = leftFirst ? cssW + 20 : -20;
+   400→        comet.y1 = cssH * (0.35 + Math.random() * 0.4);
+   401→      }
+   402→
+   403→      drawBelt(false);
+   404→      drawRings(false);
+   405→
+   406→      // ── planet painter: textured body, terminator shading, rings —
+   407→      //    called per planet in two depth passes around the sun ──
+   408→      const order = SKILLS.map((s, i) => ({ s, i, p: orbPos(s, t) })).sort((a, b) => a.p.depth - b.p.depth);
+   409→      const labelJobs: Array<{ s: Skill; x: number; y: number; priority: number; active: boolean }> = [];
+   410→      const drawPlanet = ({ s, i, p }: (typeof order)[number]) => {
+   411→        const scale = 0.72 + p.depth * 0.55;
+   412→        const r = (10 + (s.level / 100) * 9) * scale * sc;
+   413→        const isActive = i === hoverIdx || s === selectedRef.current;
+   414→        const color = CATEGORY_COLOR[s.category];
+   415→        const alpha = 0.5 + p.depth * 0.5;
+   416→        const ang = s.angle + t * RING_SPEED[s.ring] + dragOffset;
+   417→
+   418→        // motion trail — a fading arc streaming behind every planet
+   419→        const tr = RING_RADIUS[s.ring] * S();
+   420→        for (let k = 1; k <= 20; k++) {
+   421→          const aa = ang - k * 0.05;
+   422→          const z2 = Math.sin(aa);
+   423→          const tx = cx + Math.cos(aa) * tr;
+   424→          const ty = cy + z2 * tr * 0.4 + tiltX * tr * 0.08;
+   425→          const tScale = 0.72 + ((z2 + 1) / 2) * 0.55;
+   426→          ctx.globalAlpha = (1 - k / 21) * 0.13 * tScale * (isActive ? 2 : 1);
+   427→          ctx.fillStyle = color;
+   428→          ctx.beginPath();
+   429→          ctx.arc(tx, ty, r * 0.44 * tScale, 0, Math.PI * 2);
+   430→          ctx.fill();
+   431→        }
+   432→        ctx.globalAlpha = alpha;
+   433→
+   434→        // atmosphere glow
+   435→        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, r * 3.2);
+   436→        g.addColorStop(0, `${color}${isActive ? "88" : "44"}`);
+   437→        g.addColorStop(1, `${color}00`);
+   438→        ctx.fillStyle = g;
+   439→        ctx.beginPath();
+   440→        ctx.arc(p.x, p.y, r * 3.2, 0, Math.PI * 2);
+   441→        ctx.fill();
+   442→
+   443→        // procedural textured body (slow rotation, alternating direction)
+   444→        const tex = planetTex(i);
+   445→        ctx.save();
+   446→        ctx.beginPath();
+   447→        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+   448→        ctx.clip();
+   449→        ctx.translate(p.x, p.y);
+   450→        ctx.rotate(t * 0.14 * (i % 2 ? 1 : -1) + i);
+   451→        ctx.drawImage(tex, -r * 1.25, -r * 1.25, r * 2.5, r * 2.5);
+   452→        ctx.restore();
+   453→
+   454→        // terminator shading + sunlit highlight — the 3D part
+   455→        const shade = ctx.createRadialGradient(p.x - r * 0.38, p.y - r * 0.4, r * 0.1, p.x, p.y, r * 1.15);
+   456→        shade.addColorStop(0, "rgba(255,246,234,0.3)");
+   457→        shade.addColorStop(0.42, "rgba(255,255,255,0)");
+   458→        shade.addColorStop(0.78, "rgba(12,6,4,0.42)");
+   459→        shade.addColorStop(1, "rgba(8,4,2,0.76)");
+   460→        ctx.save();
+   461→        ctx.beginPath();
+   462→        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+   463→        ctx.clip();
+   464→        ctx.fillStyle = shade;
+   465→        ctx.fillRect(p.x - r, p.y - r, r * 2, r * 2);
+   466→        ctx.restore();
+   467→
+   468→        // atmosphere rim
+   469→        ctx.globalAlpha = alpha * 0.4;
+   470→        ctx.strokeStyle = color;
+   471→        ctx.lineWidth = 1.3;
+   472→        ctx.beginPath();
+   473→        ctx.arc(p.x, p.y, r + 1.2 * sc, 0, Math.PI * 2);
+   474→        ctx.stroke();
+   475→        ctx.globalAlpha = 1;
+   476→
+   477→        // ring system on the WebGL world
+   478→        if (RINGED.has(i)) {
+   479→          ctx.save();
+   480→          ctx.translate(p.x, p.y);
+   481→          ctx.rotate(0.5);
+   482→          ctx.scale(1, 0.36);
+   483→          ctx.globalAlpha = alpha * 0.8;
+   484→          ctx.strokeStyle = `${color}66`;
+   485→          ctx.lineWidth = r * 0.3;
+   486→          ctx.beginPath();
+   487→          ctx.arc(0, 0, r * 1.6, 0, Math.PI * 2);
+   488→          ctx.stroke();
+   489→          ctx.globalAlpha = alpha * 0.4;
+   490→          ctx.strokeStyle = `${color}33`;
+   491→          ctx.lineWidth = r * 0.14;
+   492→          ctx.beginPath();
+   493→          ctx.arc(0, 0, r * 1.92, 0, Math.PI * 2);
+   494→          ctx.stroke();
+   495→          ctx.restore();
+   496→          ctx.globalAlpha = 1;
+   497→        }
+   498→
+   499→        // the featured world carries a tiny rocket in a low orbit
+   500→        if (s.featured) {
+   501→          const ra = t * 1.5;
+   502→          const ro = r + 10 * sc + Math.sin(t * 2.2) * 2;
+   503→          const rx = p.x + Math.cos(ra) * ro;
+   504→          const ry2 = p.y + Math.sin(ra) * ro * 0.55;
+   505→          ctx.globalAlpha = 0.16;
+   506→          ctx.strokeStyle = "#ffc966";
+   507→          ctx.lineWidth = 0.8;
+   508→          ctx.beginPath();
+   509→          ctx.ellipse(p.x, p.y, ro, ro * 0.55, 0, 0, Math.PI * 2);
+   510→          ctx.stroke();
+   511→          ctx.globalAlpha = 0.5;
+   512→          ctx.strokeStyle = "#ffd9a8";
+   513→          ctx.lineWidth = 1.6;
+   514→          ctx.beginPath();
+   515→          ctx.ellipse(p.x, p.y, ro, ro * 0.55, 0, ra - 0.9, ra);
+   516→          ctx.stroke();
+   517→          ctx.globalAlpha = 1;
+   518→          ctx.save();
+   519→          ctx.translate(rx, ry2);
+   520→          ctx.rotate(ra + Math.PI / 2);
+   521→          ctx.fillStyle = "#f5efe6";
+   522→          ctx.beginPath();
+   523→          ctx.moveTo(0, -4.4 * sc);
+   524→          ctx.lineTo(2.5 * sc, 3 * sc);
+   525→          ctx.lineTo(-2.5 * sc, 3 * sc);
+   526→          ctx.closePath();
+   527→          ctx.fill();
+   528→          const fl = 3 + Math.sin(t * 30) * 1.6;
+   529→          const fg2 = ctx.createLinearGradient(0, 3 * sc, 0, (3 + fl) * sc);
+   530→          fg2.addColorStop(0, "rgba(255,190,110,0.95)");
+   531→          fg2.addColorStop(1, "rgba(255,90,30,0)");
+   532→          ctx.fillStyle = fg2;
+   533→          ctx.beginPath();
+   534→          ctx.moveTo(-1.4 * sc, 3 * sc);
+   535→          ctx.lineTo(1.4 * sc, 3 * sc);
+   536→          ctx.lineTo(0, (3 + fl) * sc);
+   537→          ctx.closePath();
+   538→          ctx.fill();
+   539→          ctx.restore();
+   540→        }
+   541→
+   542→        // capture ring for selected
+   543→        if (s === selectedRef.current) {
+   544→          ctx.strokeStyle = "rgba(255,190,120,0.9)";
+   545→          ctx.lineWidth = 1.2;
+   546→          ctx.setLineDash([4, 5]);
+   547→          ctx.lineDashOffset = -t * 22;
+   548→          ctx.beginPath();
+   549→          ctx.arc(p.x, p.y, r + 7 * sc, 0, Math.PI * 2);
+   550→          ctx.stroke();
+   551→          ctx.setLineDash([]);
+   552→        }
+   553→
+   554→        // proficiency arc — the skill's level as a live gauge around the world
+   555→        if (isActive) {
+   556→          const a0 = -Math.PI / 2;
+   557→          ctx.beginPath();
+   558→          ctx.arc(p.x, p.y, r + 4.2 * sc, a0, a0 + (s.level / 100) * Math.PI * 2);
+   559→          ctx.strokeStyle = color;
+   560→          ctx.lineWidth = 2.2;
+   561→          ctx.lineCap = "round";
+   562→          ctx.stroke();
+   563→          ctx.lineCap = "butt";
+   564→        }
+   565→
+   566→        // small moons on the top-tier worlds — depth, life, hierarchy
+   567→        if (MOONED.has(i)) {
+   568→          const ma = t * (1.1 + (i % 3) * 0.35) + i * 2.1;
+   569→          const mo = r + 15 * sc + (i % 2) * 3 * sc;
+   570→          const mx = p.x + Math.cos(ma) * mo;
+   571→          const my2 = p.y + Math.sin(ma) * mo * 0.42;
+   572→          const mdep = (Math.sin(ma) + 1) / 2;
+   573→          ctx.globalAlpha = alpha * (0.35 + mdep * 0.65);
+   574→          const mg = ctx.createRadialGradient(mx - 1, my2 - 1, 0, mx, my2, 3.4 * sc);
+   575→          mg.addColorStop(0, "#efe8da");
+   576→          mg.addColorStop(1, "#8f867a");
+   577→          ctx.fillStyle = mg;
+   578→          ctx.beginPath();
+   579→          ctx.arc(mx, my2, 2.6 * sc, 0, Math.PI * 2);
+   580→          ctx.fill();
+   581→          ctx.globalAlpha = 1;
+   582→        }
+   583→
+   584→        // defer the label — placed after all planets so depth sort of the
+   585→        // drawing never hides an active label behind a planet body
+   586→        labelJobs.push({ s, x: p.x, y: p.y - r - 9 * sc, priority: (isActive ? 100 : 0) + p.depth, active: isActive });
+   587→      };
+   588→
+   589→      // back planets first — they pass BEHIND the sun
+   590→      for (const o of order) if (o.p.depth < 0.5) drawPlanet(o);
+   591→
+   592→      // ── the sun: MESKAT CORE, drawn as a living star ──
+   593→      ctx.save();
+   594→      ctx.translate(cx, cy);
+   595→      ctx.rotate(t * 0.05);
+   596→      for (let i = 0; i < 14; i++) {
+   597→        const a = (i / 14) * Math.PI * 2;
+   598→        const len = pulse * (2.1 + (i % 3) * 0.5 + Math.sin(t * 1.7 + i) * 0.24);
+   599→        ctx.save();
+   600→        ctx.rotate(a);
+   601→        const rg = ctx.createLinearGradient(0, 0, len, 0);
+   602→        rg.addColorStop(0, "rgba(255,160,70,0.2)");
+   603→        rg.addColorStop(1, "rgba(255,120,40,0)");
+   604→        ctx.fillStyle = rg;
+   605→        ctx.beginPath();
+   606→        ctx.moveTo(pulse * 0.7, -2.2);
+   607→        ctx.lineTo(len, 0);
+   608→        ctx.lineTo(pulse * 0.7, 2.2);
+   609→        ctx.closePath();
+   610→        ctx.fill();
+   611→        ctx.restore();
+   612→      }
+   613→      ctx.restore();
+   614→
+   615→      const coreGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, pulse * 3.2);
+   616→      coreGlow.addColorStop(0, "rgba(255,150,70,0.5)");
+   617→      coreGlow.addColorStop(0.45, "rgba(255,110,45,0.14)");
+   618→      coreGlow.addColorStop(1, "rgba(255,90,30,0)");
+   619→      ctx.fillStyle = coreGlow;
+   620→      ctx.beginPath();
+   621→      ctx.arc(cx, cy, pulse * 3.2, 0, Math.PI * 2);
+   622→      ctx.fill();
+   623→
+   624→      const coreBody = ctx.createRadialGradient(cx - 6, cy - 6, 2, cx, cy, pulse);
+   625→      coreBody.addColorStop(0, "#fff3e2");
+   626→      coreBody.addColorStop(0.55, "#ff9d52");
+   627→      coreBody.addColorStop(1, "#c2481c");
+   628→      ctx.fillStyle = coreBody;
+   629→      ctx.beginPath();
+   630→      ctx.arc(cx, cy, pulse, 0, Math.PI * 2);
+   631→      ctx.fill();
+   632→
+   633→      // horizontal flare streak across the star
+   634→      const flare = ctx.createLinearGradient(cx - pulse * 3.4, cy, cx + pulse * 3.4, cy);
+   635→      flare.addColorStop(0, "rgba(255,180,110,0)");
+   636→      flare.addColorStop(0.5, "rgba(255,214,150,0.2)");
+   637→      flare.addColorStop(1, "rgba(255,180,110,0)");
+   638→      ctx.fillStyle = flare;
+   639→      ctx.fillRect(cx - pulse * 3.4, cy - 1.1, pulse * 6.8, 2.2);
+   640→
+   641→      // rotating instrument halo around the core
+   642→      ctx.setLineDash([2, 6]);
+   643→      ctx.lineDashOffset = -t * 14;
+   644→      ctx.strokeStyle = "rgba(255,171,105,0.4)";
+   645→      ctx.lineWidth = 1;
+   646→      ctx.beginPath();
+   647→      ctx.arc(cx, cy, pulse + 12 * sc, 0, Math.PI * 2);
+   648→      ctx.stroke();
+   649→      ctx.setLineDash([]);
+   650→
+   651→      // ── front planets, then the front halves of the rings & belt ──
+   652→      for (const o of order) if (o.p.depth >= 0.5) drawPlanet(o);
+   653→      drawRings(true);
+   654→      drawBelt(true);
+   655→
+   656→      // ── collision-aware labels ─────────────────────────────
+   657→      // On small canvases 12 labels overlap into soup. Draw planets first,
+   658→      // then greedily place labels front-to-back; anything that would
+   659→      // intersect an already-placed label (or the core caption) is skipped.
+   660→      type Box = { x: number; y: number; w: number; h: number };
+   661→      const occupied: Box[] = [];
+   662→      const hits = (b: Box) =>
+   663→        occupied.some(
+   664→          (o) =>
+   665→            b.x - 4 < o.x + o.w && b.x + b.w + 4 > o.x && b.y - 3 < o.y + o.h && b.y + b.h + 3 > o.y
+   666→        );
+   667→
+   668→      ctx.textAlign = "center";
+   669→
+   670→      // MESKAT CORE — the caption is a designed plate now: flame-gradient
+   671→      // wordmark, breathing survey brackets and a live status subline
+   672→      const coreFs = Math.max(11, 13.5 * sc);
+   673→      const coreFont = `700 ${coreFs}px ${dispFam}`;
+   674→      ctx.font = coreFont;
+   675→      const spaced = "MESKAT CORE".split("").join("\u2009");
+   676→      const coreW = ctx.measureText(spaced).width;
+   677→      const coreY = cy + pulse + 24 * sc;
+   678→      occupied.push({
+   679→        x: cx - coreW / 2 - 14 * sc,
+   680→        y: coreY - coreFs - 3,
+   681→        w: coreW + 28 * sc,
+   682→        h: coreFs + 18 * sc,
+   683→      });
+   684→      const wordGrad = ctx.createLinearGradient(cx - coreW / 2, 0, cx + coreW / 2, 0);
+   685→      wordGrad.addColorStop(0, "#ffd9a8");
+   686→      wordGrad.addColorStop(0.5, "#ff8b3d");
+   687→      wordGrad.addColorStop(1, "#ff5e2b");
+   688→      ctx.save();
+   689→      ctx.font = coreFont;
+   690→      ctx.shadowColor = "rgba(255,139,61,0.55)";
+   691→      ctx.shadowBlur = 14;
+   692→      ctx.fillStyle = wordGrad;
+   693→      ctx.fillText(spaced, cx, coreY);
+   694→      ctx.restore();
+   695→
+   696→      // breathing survey brackets
+   697→      const bkw = coreW / 2 + 10 * sc;
+   698→      const breathe = Math.sin(t * 2) * 2.4 * sc;
+   699→      ctx.strokeStyle = "rgba(255,201,102,0.8)";
+   700→      ctx.lineWidth = 1.4;
+   701→      ctx.beginPath();
+   702→      ctx.moveTo(cx - bkw - 6 * sc - breathe, coreY - coreFs * 0.82);
+   703→      ctx.lineTo(cx - bkw - breathe, coreY - coreFs * 0.82);
+   704→      ctx.lineTo(cx - bkw - breathe, coreY + 4);
+   705→      ctx.stroke();
+   706→      ctx.beginPath();
+   707→      ctx.moveTo(cx + bkw + 6 * sc + breathe, coreY - coreFs * 0.82);
+   708→      ctx.lineTo(cx + bkw + breathe, coreY - coreFs * 0.82);
+   709→      ctx.lineTo(cx + bkw + breathe, coreY + 4);
+   710→      ctx.stroke();
+   711→
+   712→      // live status subline
+   713→      ctx.font = `500 ${Math.max(7.5, 8.4 * sc)}px ${dispFam}`;
+   714→      ctx.fillStyle = `rgba(201,188,174,${0.52 + 0.24 * Math.sin(t * 1.8)})`;
+   715→      ctx.fillText("SYSTEM ONLINE · 12 WORLDS · 60 FPS", cx, coreY + 14 * sc);
+   716→
+   717→      // greedy label placement: highest priority (active/selected, then
+   718→      // nearest) claims its spot first; the rest yield when crowded
+   719→      labelJobs.sort((a, b) => b.priority - a.priority);
+   720→      ctx.textAlign = "center";
+   721→      for (const job of labelJobs) {
+   722→        const fs = Math.max(10, (11 + (job.active ? 1.5 : 0)) * sc);
+   723→        ctx.font = `${job.active ? 700 : 500} ${fs}px ${dispFam}`;
+   724→        const labelText = job.active ? `${job.s.name} · ${job.s.level}%` : job.s.name;
+   725→        const w = ctx.measureText(labelText).width;
+   726→        const box: Box = { x: job.x - w / 2, y: job.y - fs, w, h: fs * 1.25 };
+   727→        // labels never leave the canvas
+   728→        if (box.x < 2 || box.x + box.w > cssW - 2) continue;
+   729→        if (!job.active && hits(box)) continue;
+   730→        occupied.push(box);
+   731→        ctx.globalAlpha = job.active ? 1 : 0.4 + 0.6 * Math.min(1, job.priority);
+   732→        ctx.font = `${job.active ? 700 : 500} ${fs}px ${dispFam}`;
+   733→        ctx.shadowColor = "rgba(5,3,8,0.9)";
+   734→        ctx.shadowBlur = 6;
+   735→        ctx.fillStyle = job.active ? "#ffe9d0" : "#c9bcae";
+   736→        ctx.fillText(labelText, job.x, job.y);
+   737→        ctx.shadowBlur = 0;
+   738→        ctx.globalAlpha = 1;
+   739→      }
+   740→    };
+   741→    draw();
+   742→
+   743→    return () => {
+   744→      cancelAnimationFrame(raf);
+   745→      ro.disconnect();
+   746→      canvas.removeEventListener("pointermove", onMove);
+   747→      canvas.removeEventListener("pointerdown", onDown);
+   748→      canvas.removeEventListener("pointerup", onUp);
+   749→      canvas.removeEventListener("pointerleave", onLeave);
+   750→    };
+   751→  }, []);
+   752→
+   753→  const shown = hovered ?? selected;
+   754→
+   755→  return (
+   756→    <section id="skills" className="relative px-5 sm:px-8 py-28 sm:py-36">
+   757→      <div className="mx-auto max-w-6xl">
+   758→        <motion.div
+   759→          initial={{ opacity: 0, y: 20 }}
+   760→          whileInView={{ opacity: 1, y: 0 }}
+   761→          viewport={{ once: true, margin: "-80px" }}
+   762→          transition={{ duration: 0.7 }}
+   763→        >
+   764→          <span className="stage-chip">
+   765→            <span className="chip-dot" />
+   766→            Stage 02 · Ascent
+   767→          </span>
+   768→        </motion.div>
+   769→
+   770→        <div ref={headerRef} className="mt-10 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6 will-change-[opacity]">
+   771→          <motion.h2
+   772→            initial={{ opacity: 0, y: 30 }}
+   773→            whileInView={{ opacity: 1, y: 0 }}
+   774→            viewport={{ once: true, margin: "-80px" }}
+   775→            transition={{ duration: 0.8 }}
+   776→            className="font-[family-name:var(--font-display)] font-bold leading-[1.05] text-[clamp(30px,5vw,52px)]"
+   777→          >
+   778→            The skill
+   779→            <span className="flame-text"> solar system.</span>
+   780→          </motion.h2>
+   781→          <motion.p
+   782→            initial={{ opacity: 0 }}
+   783→            whileInView={{ opacity: 1 }}
+   784→            viewport={{ once: true }}
+   785→            transition={{ delay: 0.15, duration: 0.8 }}
+   786→            className="flex items-center gap-2 text-[13px] text-[#a99b8e] font-[family-name:var(--font-display)] tracking-wide"
+   787→          >
+   788→            <Hand size={14} className="hidden sm:block" aria-hidden />
+   789→            <MousePointer2 size={14} className="sm:hidden" aria-hidden />
+   790→            Drag to spin the system · tap a planet to open its file
+   791→          </motion.p>
+   792→        </div>
+   793→
+   794→        <div className="mt-12 grid lg:grid-cols-[minmax(0,1fr)_minmax(0,360px)] gap-10 items-center">
+   795→          {/* the system — min-w-0: the canvas' intrinsic size must never be
+   796→              allowed to widen the grid track on small/desktop-mode screens */}
+   797→          <motion.div
+   798→            initial={{ opacity: 0, scale: 0.94 }}
+   799→            whileInView={{ opacity: 1, scale: 1 }}
+   800→            viewport={{ once: true, margin: "-100px" }}
+   801→            transition={{ duration: 1, ease: [0.22, 1, 0.36, 1] }}
+   802→            ref={wrapRef}
+   803→            className="relative mx-auto w-full min-w-0 max-w-[720px] aspect-square"
+   804→          >
+   805→            {/* zoom stage — the scroll-driven fullscreen swell scales this */}
+   806→            <div ref={zoomRef} className="absolute inset-0 will-change-transform">
+   807→              {/* soft space bubble so the 3D rocket behind never fights the system */}
+   808→              <div
+   809→                aria-hidden
+   810→                className="absolute inset-0 rounded-full"
+   811→                style={{
+   812→                  background:
+   813→                    "radial-gradient(circle at 50% 50%, rgba(8,6,10,0.9) 0%, rgba(8,6,10,0.74) 55%, rgba(8,6,10,0) 74%)",
+   814→                }}
+   815→              />
+   816→              <canvas
+   817→                ref={canvasRef}
+   818→                className="relative z-10 w-full h-full block"
+   819→                aria-label="Interactive solar system map of Meskat's skills"
+   820→                role="img"
+   821→              />
+   822→            </div>
+   823→          </motion.div>
+   824→
+   825→          {/* info panel */}
+   826→          <motion.div
+   827→            initial={{ opacity: 0, y: 30 }}
+   828→            whileInView={{ opacity: 1, y: 0 }}
+   829→            viewport={{ once: true, margin: "-80px" }}
+   830→            transition={{ duration: 0.8, delay: 0.1 }}
+   831→            className="rounded-[28px] glass p-6 sm:p-8 min-h-[240px] sm:min-h-[280px] w-full max-w-full min-w-0 flex flex-col overflow-hidden will-change-[opacity]"
+   832→            style={{ background: "rgba(12,8,14,0.55)" }}
+   833→            ref={panelRef}
+   834→          >
+   835→            <div className="flex items-center justify-between">
+   836→              <span
+   837→                className="text-[10px] tracking-[0.3em] uppercase font-[family-name:var(--font-display)] px-3 py-1.5 rounded-full border"
+   838→                style={{ color: CATEGORY_COLOR[shown.category], borderColor: `${CATEGORY_COLOR[shown.category]}44` }}
+   839→              >
+   840→                {shown.category} system
+   841→              </span>
+   842→              <span className="text-[11px] text-[#a99b8e] tabular-nums tracking-widest">
+   843→                {String(SKILLS.indexOf(shown) + 1).padStart(2, "0")} / {SKILLS.length}
+   844→              </span>
+   845→            </div>
+   846→
+   847→            {shown.featured && (
+   848→              <div className="mt-4 flex items-center gap-2 rounded-2xl border border-[#ffc9663c] bg-[#ffc9660d] px-3.5 py-2">
+   849→                <span className="relative flex h-2 w-2">
+   850→                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#ffc966] opacity-70" />
+   851→                  <span className="relative inline-flex h-2 w-2 rounded-full bg-[#ffc966]" />
+   852→                </span>
+   853→                <span className="text-[10px] tracking-[0.26em] uppercase font-[family-name:var(--font-display)] text-[#ffc966]">
+   854→                  This website · you are inside the demo
+   855→                </span>
+   856→              </div>
+   857→ )}
+   858→
+   859→            <h3 className="mt-5 font-[family-name:var(--font-display)] font-bold text-[26px] text-[#f5efe6]">
+   860→              {shown.name}
+   861→            </h3>
+   862→
+   863→            <div className="mt-4">
+   864→              <div className="flex justify-between text-[11px] text-[#a99b8e] tracking-wider mb-2">
+   865→                <span>{shown.featured ? "RENDER STABILITY · 60 FPS" : "ORBIT STABILITY"}</span>
+   866→                <span className="tabular-nums">{shown.level}%</span>
+   867→              </div>
+   868→              <div className="h-2 rounded-full bg-white/8 overflow-hidden">
+   869→                <motion.div
+   870→                  key={shown.name}
+   871→                  initial={{ width: 0 }}
+   872→                  animate={{ width: `${shown.level}%` }}
+   873→                  transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+   874→                  className="h-full rounded-full"
+   875→                  style={{ background: `linear-gradient(90deg, ${CATEGORY_COLOR[shown.category]}66, ${CATEGORY_COLOR[shown.category]})` }}
+   876→                />
+   877→              </div>
+   878→            </div>
+   879→
+   880→            <p className="mt-5 text-[14px] leading-relaxed text-[#c9bcae] break-words">{shown.blurb}</p>
+   881→
+   882→            {shown.featured && (
+   883→              <p className="mt-4 pl-4 border-l-2 border-[#ff8b3d66] text-[12.5px] italic leading-relaxed text-[#a99b8e]">
+   884→                {shown.detail}
+   885→              </p>
+   886→ )}
+   887→          </motion.div>
+   888→        </div>
+   889→      </div>
+   890→
+   891→      {/* fullscreen veil — darkens the world while the system swallows the screen */}
+   892→      <div
+   893→        ref={veilRef}
+   894→        aria-hidden
+   895→        className="fixed inset-0 z-[44] pointer-events-none"
+   896→        style={{
+   897→          opacity: 0,
+   898→          background:
+   899→            "radial-gradient(120% 100% at 50% 46%, rgba(8,5,14,0.92) 0%, rgba(4,2,8,0.96) 58%, rgba(2,1,4,0.99) 100%)",
+   900→        }}
+   901→      />
+   902→      {/* hint while the system is fullscreen */}
+   903→      <div
+   904→        ref={hintRef}
+   905→        aria-hidden
+   906→        className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[46] pointer-events-none"
+   907→        style={{ opacity: 0 }}
+   908→      >
+   909→        <span className="flex items-center gap-2.5 rounded-full border border-[#ffc9663a] bg-[#120c14e8] px-4 py-2 text-[10px] tracking-[0.3em] uppercase font-[family-name:var(--font-display)] text-[#ffc966] whitespace-nowrap">
+   910→          <span className="w-1.5 h-1.5 rounded-full bg-[#ffc966] animate-pulse inline-block" />
+   911→          drag to spin · tap a world
+   912→        </span>
+   913→      </div>
+   914→
+   915→      {/* expanded planet dossier — opens on planet click */}
+   916→      <AnimatePresence>
+   917→        {expanded && (
+   918→          <motion.div
+   919→            key="dossier-backdrop"
+   920→            initial={{ opacity: 0 }}
+   921→            animate={{ opacity: 1 }}
+   922→            exit={{ opacity: 0 }}
+   923→            transition={{ duration: 0.25 }}
+   924→            className="fixed inset-0 z-[85] flex items-center justify-center"
+   925→            style={{
+   926→              background: "rgba(4,2,7,0.62)",
+   927→              backdropFilter: "blur(14px)",
+   928→              padding: "clamp(16px, 5vw, 32px)",
+   929→            }}
+   930→            onClick={() => setExpanded(null)}
+   931→            role="dialog"
+   932→            aria-modal="true"
+   933→            aria-label={`${expanded.name} — skill dossier`}
+   934→          >
+   935→            <motion.div
+   936→              key="dossier-card"
+   937→              initial={{ opacity: 0, scale: 0.86, y: 26 }}
+   938→              animate={{ opacity: 1, scale: 1, y: 0 }}
+   939→              exit={{ opacity: 0, scale: 0.9, y: 18 }}
+   940→              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+   941→              onClick={(e) => e.stopPropagation()}
+   942→              className="relative w-full max-w-[520px] rounded-[32px] glass overflow-hidden"
+   943→              style={{
+   944→                boxShadow: `0 40px 120px -30px ${CATEGORY_COLOR[expanded.category]}55`,
+   945→                padding: "clamp(22px, 4.5vw, 36px)",
+   946→                maxHeight: "86dvh",
+   947→                overflowY: "auto",
+   948→              }}
+   949→            >
+   950→              {/* category glow wash */}
+   951→              <div
+   952→                aria-hidden
+   953→                className="absolute -top-24 -right-24 w-72 h-72 rounded-full pointer-events-none"
+   954→                style={{ background: `radial-gradient(circle, ${CATEGORY_COLOR[expanded.category]}2e, transparent 70%)` }}
+   955→              />
+   956→
+   957→              <button
+   958→                onClick={() => setExpanded(null)}
+   959→                aria-label="Close dossier"
+   960→                className="absolute top-5 right-5 w-10 h-10 rounded-full grid place-items-center border border-white/15 text-[#c9bcae] hover:text-[#f5efe6] hover:border-[#ff8b3d66] transition-colors"
+   961→              >
+   962→                <X size={17} />
+   963→              </button>
+   964→
+   965→              <div className="flex items-center gap-2.5 text-[10px] tracking-[0.3em] uppercase font-[family-name:var(--font-display)] text-[#a99b8e]">
+   966→                <Orbit size={13} className="text-[#ff8b3d]" aria-hidden />
+   967→                Skill dossier · {String(SKILLS.indexOf(expanded) + 1).padStart(2, "0")} / {SKILLS.length}
+   968→              </div>
+   969→
+   970→              <div className="mt-6 flex items-center gap-5">
+   971→                {/* the planet, pulled out of orbit */}
+   972→                <motion.span
+   973→                  initial={{ scale: 0.4, rotate: -20 }}
+   974→                  animate={{ scale: 1, rotate: 0 }}
+   975→                  transition={{ delay: 0.1, duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+   976→                  aria-hidden
+   977→                  className="shrink-0 w-16 h-16 rounded-full"
+   978→                  style={{
+   979→                    background: `radial-gradient(circle at 32% 30%, #fff6ea 0%, ${CATEGORY_COLOR[expanded.category]} 46%, #20140c 100%)`,
+   980→                    boxShadow: `0 0 34px ${CATEGORY_COLOR[expanded.category]}66, inset -6px -8px 16px rgba(0,0,0,0.55)`,
+   981→                  }}
+   982→                />
+   983→                <div>
+   984→                  {expanded.featured && (
+   985→                    <span className="mb-2 inline-flex items-center gap-1.5 text-[9.5px] tracking-[0.24em] uppercase font-[family-name:var(--font-display)] text-[#ffc966]">
+   986→                      <span className="w-1.5 h-1.5 rounded-full bg-[#ffc966] animate-pulse inline-block" aria-hidden />
+   987→                      this website · live demo
+   988→                    </span>
+   989→                  )}
+   990→                  <h3 className="font-[family-name:var(--font-display)] font-bold text-[clamp(24px,5vw,34px)] leading-tight text-[#f5efe6]">
+   991→                    {expanded.name}
+   992→                  </h3>
+   993→                  <span
+   994→                    className="mt-1.5 inline-block text-[10px] tracking-[0.28em] uppercase font-[family-name:var(--font-display)] px-3 py-1 rounded-full border"
+   995→                    style={{ color: CATEGORY_COLOR[expanded.category], borderColor: `${CATEGORY_COLOR[expanded.category]}44` }}
+   996→                  >
+   997→                    {expanded.category} system · ring {expanded.ring + 1}
+   998→                  </span>
+   999→                </div>
+  1000→              </div>
+  1001→
+  1002→              <p className="mt-6 text-[14.5px] leading-relaxed text-[#c9bcae]">{expanded.blurb}</p>
+  1003→
+  1004→              <div className="mt-4 pl-5 border-l-2 text-[13.5px] italic leading-relaxed text-[#a99b8e]" style={{ borderColor: `${CATEGORY_COLOR[expanded.category]}66` }}>
+  1005→                {expanded.detail}
+  1006→              </div>
+  1007→
+  1008→              <div className="mt-7">
+  1009→                <div className="flex justify-between text-[11px] text-[#a99b8e] tracking-wider mb-2">
+  1010→                  <span>ORBIT STABILITY</span>
+  1011→                  <span className="tabular-nums">{expanded.level}%</span>
+  1012→                </div>
+  1013→                <div className="h-2 rounded-full bg-white/8 overflow-hidden">
+  1014→                  <motion.div
+  1015→                    initial={{ width: 0 }}
+  1016→                    animate={{ width: `${expanded.level}%` }}
+  1017→                    transition={{ duration: 0.9, delay: 0.15, ease: [0.22, 1, 0.36, 1] }}
+  1018→                    className="h-full rounded-full"
+  1019→                    style={{ background: `linear-gradient(90deg, ${CATEGORY_COLOR[expanded.category]}66, ${CATEGORY_COLOR[expanded.category]})` }}
+  1020→                  />
+  1021→                </div>
+  1022→              </div>
+  1023→            </motion.div>
+  1024→          </motion.div>
+  1025→        )}
+  1026→      </AnimatePresence>
+  1027→    </section>
+  1028→  );
+  1029→}
+  1030→

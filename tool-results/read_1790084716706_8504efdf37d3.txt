@@ -1,0 +1,702 @@
+     1→   701→      256
+     2→   702→    );
+     3→   703→    const glowTex = makeRadialTexture([
+     4→   704→      [0, "rgba(255,180,110,0.9)"],
+     5→   705→      [0.4, "rgba(255,120,50,0.35)"],
+     6→   706→      [1, "rgba(255,90,30,0)"],
+     7→   707→    ]);
+     8→   708→    const sunTex = makeRadialTexture([
+     9→   709→      [0, "rgba(255,244,224,1)"],
+    10→   710→      [0.18, "rgba(255,214,150,0.95)"],
+    11→   711→      [0.42, "rgba(255,150,80,0.4)"],
+    12→   712→      [1, "rgba(255,120,60,0)"],
+    13→   713→    ]);
+    14→   714→    const starTex = makeRadialTexture(
+    15→   715→      [
+    16→   716→        [0, "rgba(255,255,255,1)"],
+    17→   717→        [0.45, "rgba(255,240,225,0.55)"],
+    18→   718→        [1, "rgba(255,240,225,0)"],
+    19→   719→      ],
+    20→   720→      32
+    21→   721→    );
+    22→   722→    const diamondTex = makeDiamondTexture();
+    23→   723→    const earthCloudsTex = makeCloudLayerTexture(isMobile ? 512 : 1024);
+    24→   724→    const earthSurfTex = makeEarthSurfaceTexture(isMobile ? 512 : 1024);
+    25→   725→    const moonTex = makeMoonSurfaceTexture(isMobile ? 512 : 1024);
+    26→   726→    const galaxyTex = makeGalaxyTexture();
+    27→   727→    const groundTex = makeGroundTexture();
+    28→   728→    const solarTex = makeSolarTexture();
+    29→   729→    const atmoRingTex = makeAtmoRingTexture();
+    30→   730→    const rockyTex = makeRockyPlanetTexture(isMobile ? 512 : 1024);
+    31→   731→    const gasTex = makeGasGiantTexture(isMobile ? 512 : 1024);
+    32→   732→    const iceTex = makeIceGiantTexture(isMobile ? 512 : 1024);
+    33→   733→    const ringTex = makeRingTexture();
+    34→   734→    const maxAniso = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+    35→   735→    [rockyTex, gasTex, iceTex, ringTex, earthCloudsTex, earthSurfTex, moonTex].forEach((t) => (t.anisotropy = maxAniso));
+    36→   736→
+    37→   737→    // ── rocket (detailed vehicle) ─────────────────────────────
+    38→   738→    const seg = isMobile ? 20 : 32;
+    39→   739→    const rocket = new THREE.Group();
+    40→   740→
+    41→   741→    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf1e9d7, roughness: 0.32, metalness: 0.55 });
+    42→   742→    const sootMat = new THREE.MeshStandardMaterial({ color: 0xc9bda6, roughness: 0.55, metalness: 0.4 });
+    43→   743→    const darkMat = new THREE.MeshStandardMaterial({ color: 0x18131a, roughness: 0.45, metalness: 0.72 });
+    44→   744→    const accentMat = new THREE.MeshStandardMaterial({ color: 0xff8b3d, roughness: 0.34, metalness: 0.42 });
+    45→   745→    const engineMat = new THREE.MeshStandardMaterial({ color: 0x2c2428, roughness: 0.3, metalness: 0.9 });
+    46→   746→
+    47→   747→    // stack: engine skirt → sooty base → main body → taper → nose
+    48→   748→    const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.76, 1.0, seg), sootMat);
+    49→   749→    skirt.position.y = 0.68;
+    50→   750→    rocket.add(skirt);
+    51→   751→    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.72, 4.2, seg), bodyMat);
+    52→   752→    body.position.y = 3.05;
+    53→   753→    rocket.add(body);
+    54→   754→    const topSection = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.62, 0.72, seg), bodyMat);
+    55→   755→    topSection.position.y = 5.5;
+    56→   756→    rocket.add(topSection);
+    57→   757→    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.5, seg), accentMat);
+    58→   758→    nose.position.y = 6.6;
+    59→   759→    rocket.add(nose);
+    60→   760→    const interstage = new THREE.Mesh(new THREE.CylinderGeometry(0.624, 0.624, 0.26, seg), darkMat);
+    61→   761→    interstage.position.y = 4.62;
+    62→   762→    rocket.add(interstage);
+    63→   763→    const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.628, 0.628, 0.16, seg), accentMat);
+    64→   764→    stripe.position.y = 3.9;
+    65→   765→    rocket.add(stripe);
+    66→   766→
+    67→   767→    // porthole
+    68→   768→    const porthole = new THREE.Mesh(
+    69→   769→      new THREE.CircleGeometry(0.19, 24),
+    70→   770→      new THREE.MeshStandardMaterial({ color: 0x0e0a12, roughness: 0.15, metalness: 0.85 })
+    71→   771→    );
+    72→   772→    porthole.position.set(0, 3.5, 0.622);
+    73→   773→    rocket.add(porthole);
+    74→   774→    const portholeRing = new THREE.Mesh(new THREE.TorusGeometry(0.22, 0.045, 10, 28), accentMat);
+    75→   775→    portholeRing.position.set(0, 3.5, 0.615);
+    76→   776→    rocket.add(portholeRing);
+    77→   777→
+    78→   778→    // grid fins ×4 (titanium dark)
+    79→   779→    for (let i = 0; i < 4; i++) {
+    80→   780→      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.36, 0.05), darkMat);
+    81→   781→      const a = (i / 4) * Math.PI * 2;
+    82→   782→      fin.position.set(Math.sin(a) * 0.66, 5.16, Math.cos(a) * 0.66);
+    83→   783→      fin.rotation.y = a;
+    84→   784→      rocket.add(fin);
+    85→   785→    }
+    86→   786→    // landing legs ×4, folded against the base
+    87→   787→    for (let i = 0; i < 4; i++) {
+    88→   788→      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.1, 2.2, 0.24), darkMat);
+    89→   789→      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    90→   790→      leg.position.set(Math.sin(a) * 0.72, 1.35, Math.cos(a) * 0.72);
+    91→   791→      leg.rotation.y = a;
+    92→   792→      leg.rotation.x = 0.1;
+    93→   793→      rocket.add(leg);
+    94→   794→    }
+    95→   795→    // engine bay + bells
+    96→   796→    const engineBay = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.5, 0.34, seg), darkMat);
+    97→   797→    engineBay.position.y = 0.05;
+    98→   798→    rocket.add(engineBay);
+    99→   799→    const bellCenter = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.32, 0.46, 16, 1, true), engineMat);
+   100→   800→    bellCenter.position.y = -0.34;
+   101→   801→    rocket.add(bellCenter);
+   102→   802→    for (let i = 0; i < 4; i++) {
+   103→   803→      const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.2, 0.32, 12, 1, true), engineMat);
+   104→   804→      const a = (i / 4) * Math.PI * 2;
+   105→   805→      bell.position.set(Math.sin(a) * 0.34, -0.26, Math.cos(a) * 0.34);
+   106→   806→      rocket.add(bell);
+   107→   807→    }
+   108→   808→
+   109→   809→    // ── plume (shock diamonds + vacuum expansion) ─────────────
+   110→   810→    const plumeGroup = new THREE.Group();
+   111→   811→    plumeGroup.position.y = -0.5;
+   112→   812→    rocket.add(plumeGroup);
+   113→   813→
+   114→   814→    const plumeOuterMat = new THREE.MeshBasicMaterial({
+   115→   815→      map: diamondTex,
+   116→   816→      color: 0xffa14d,
+   117→   817→      transparent: true,
+   118→   818→      opacity: 0.8,
+   119→   819→      blending: THREE.AdditiveBlending,
+   120→   820→      depthWrite: false,
+   121→   821→      side: THREE.DoubleSide,
+   122→   822→    });
+   123→   823→    const plumeOuter = new THREE.Mesh(new THREE.ConeGeometry(0.5, 3.4, seg, 1, true), plumeOuterMat);
+   124→   824→    plumeOuter.rotation.x = Math.PI;
+   125→   825→    plumeOuter.position.y = -1.7;
+   126→   826→    plumeGroup.add(plumeOuter);
+   127→   827→
+   128→   828→    const plumeInnerMat = new THREE.MeshBasicMaterial({
+   129→   829→      color: 0xffe7c0,
+   130→   830→      transparent: true,
+   131→   831→      opacity: 0.9,
+   132→   832→      blending: THREE.AdditiveBlending,
+   133→   833→      depthWrite: false,
+   134→   834→      side: THREE.DoubleSide,
+   135→   835→    });
+   136→   836→    const plumeInner = new THREE.Mesh(new THREE.ConeGeometry(0.22, 1.9, 16, 1, true), plumeInnerMat);
+   137→   837→    plumeInner.rotation.x = Math.PI;
+   138→   838→    plumeInner.position.y = -0.95;
+   139→   839→    plumeGroup.add(plumeInner);
+   140→   840→
+   141→   841→    const flameGlow = new THREE.Sprite(
+   142→   842→      new THREE.SpriteMaterial({ map: glowTex, color: 0xffa050, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+   143→   843→    );
+   144→   844→    flameGlow.scale.setScalar(6);
+   145→   845→    flameGlow.position.y = -1.1;
+   146→   846→    plumeGroup.add(flameGlow);
+   147→   847→    plumeGroup.visible = false;
+   148→   848→
+   149→   849→    rocket.scale.setScalar(isMobile ? 0.74 : 1);
+   150→   850→    scene.add(rocket);
+   151→   851→
+   152→   852→    // ── launch complex (LC at dusk) ───────────────────────────
+   153→   853→    const pad = new THREE.Group();
+   154→   854→
+   155→   855→    const ground = new THREE.Mesh(
+   156→   856→      new THREE.CircleGeometry(800, 64),
+   157→   857→      new THREE.MeshStandardMaterial({ map: groundTex, color: 0x9a939e, roughness: 0.96, metalness: 0.05 })
+   158→   858→    );
+   159→   859→    ground.rotation.x = -Math.PI / 2;
+   160→   860→    pad.add(ground);
+   161→   861→
+   162→   862→    const concrete = new THREE.Mesh(
+   163→   863→      new THREE.CylinderGeometry(9.5, 11, 0.55, 48),
+   164→   864→      new THREE.MeshStandardMaterial({ color: 0x3c3a40, roughness: 0.9, metalness: 0.08 })
+   165→   865→    );
+   166→   866→    concrete.position.y = 0.27;
+   167→   867→    pad.add(concrete);
+   168→   868→
+   169→   869→    // flame trench: dark slot under the vehicle + deflect ramps
+   170→   870→    const trenchSlot = new THREE.Mesh(
+   171→   871→      new THREE.BoxGeometry(2.8, 0.1, 7.6),
+   172→   872→      new THREE.MeshStandardMaterial({ color: 0x070509, roughness: 1 })
+   173→   873→    );
+   174→   874→    trenchSlot.position.y = 0.56;
+   175→   875→    pad.add(trenchSlot);
+   176→   876→    const rampMat = new THREE.MeshStandardMaterial({ color: 0x2e2c33, roughness: 0.85 });
+   177→   877→    [1, -1].forEach((s) => {
+   178→   878→      const ramp = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.18, 3.4), rampMat);
+   179→   879→      ramp.position.set(0, 0.9, s * 4.4);
+   180→   880→      ramp.rotation.x = s * -0.42;
+   181→   881→      pad.add(ramp);
+   182→   882→    });
+   183→   883→
+   184→   884→    // strongback tower: lattice truss with retracting service arm
+   185→   885→    const tower = new THREE.Group();
+   186→   886→    tower.position.set(-3.6, 0, -0.4);
+   187→   887→    const steelMat = new THREE.MeshStandardMaterial({ color: 0x232028, roughness: 0.55, metalness: 0.68 });
+   188→   888→    for (const [cx, cz] of [[-0.72, -0.72], [0.72, -0.72], [-0.72, 0.72], [0.72, 0.72]]) {
+   189→   889→      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.095, 12.2, 8), steelMat);
+   190→   890→      col.position.set(cx, 6.1, cz);
+   191→   891→      tower.add(col);
+   192→   892→    }
+   193→   893→    for (let h = 1.1; h <= 11.5; h += 1.05) {
+   194→   894→      const rungX = new THREE.Mesh(new THREE.BoxGeometry(1.44, 0.055, 0.055), steelMat);
+   195→   895→      rungX.position.set(0, h, 0.72);
+   196→   896→      tower.add(rungX);
+   197→   897→      const rungX2 = rungX.clone();
+   198→   898→      rungX2.position.z = -0.72;
+   199→   899→      tower.add(rungX2);
+   200→   900→      const rungZ = new THREE.Mesh(new THREE.BoxGeometry(0.055, 0.055, 1.44), steelMat);
+   201→   901→      rungZ.position.set(0.72, h, 0);
+   202→   902→      tower.add(rungZ);
+   203→   903→      const rungZ2 = rungZ.clone();
+   204→   904→      rungZ2.position.x = -0.72;
+   205→   905→      tower.add(rungZ2);
+   206→   906→      if (Math.round(h * 100) % 210 < 60) {
+   207→   907→        const brace = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 1.9), steelMat);
+   208→   908→        brace.position.set(0.72, h + 0.5, 0);
+   209→   909→        brace.rotation.x = 0.75;
+   210→   910→        tower.add(brace);
+   211→   911→        const brace2 = brace.clone();
+   212→   912→        brace2.position.x = -0.72;
+   213→   913→        tower.add(brace2);
+   214→   914→      }
+   215→   915→    }
+   216→   916→    // crane arm at the top
+   217→   917→    const crane = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.6, 0.12), steelMat);
+   218→   918→    crane.position.set(0.5, 13.2, 0);
+   219→   919→    crane.rotation.z = 0.5;
+   220→   920→    tower.add(crane);
+   221→   921→    pad.add(tower);
+   222→   922→
+   223→   923→    // service arm on a pivot — retracts before liftoff
+   224→   924→    const armPivot = new THREE.Group();
+   225→   925→    armPivot.position.set(-2.6, 4.7, -0.4);
+   226→   926→    const arm = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.4, 0.55), steelMat);
+   227→   927→    arm.position.x = 1.1;
+   228→   928→    armPivot.add(arm);
+   229→   929→    const armTruss = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.08, 0.4), steelMat);
+   230→   930→    armTruss.position.set(1.1, 0.3, 0);
+   231→   931→    armPivot.add(armTruss);
+   232→   932→    pad.add(armPivot);
+   233→   933→
+   234→   934→    // lightning masts ×3 with beacon tips
+   235→   935→    const beaconTexMat = () =>
+   236→   936→      new THREE.SpriteMaterial({ map: glowTex, color: 0xff4444, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false });
+   237→   937→    const masts: THREE.Sprite[] = [];
+   238→   938→    const mastSpots: Array<[number, number]> = [[16, -13], [-26, 30], [-4, -19]];
+   239→   939→    mastSpots.forEach(([mx, mz]) => {
+   240→   940→      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.2, 16, 8), steelMat);
+   241→   941→      mast.position.set(mx, 8, mz);
+   242→   942→      pad.add(mast);
+   243→   943→      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.7, 8), steelMat);
+   244→   944→      tip.position.set(mx, 16.3, mz);
+   245→   945→      pad.add(tip);
+   246→   946→      const beacon = new THREE.Sprite(beaconTexMat());
+   247→   947→      beacon.scale.setScalar(1.4);
+   248→   948→      beacon.position.set(mx, 16.8, mz);
+   249→   949→      masts.push(beacon);
+   250→   950→      pad.add(beacon);
+   251→   951→    });
+   252→   952→
+   253→   953→    // water tower
+   254→   954→    const waterTank = new THREE.Mesh(
+   255→   955→      new THREE.SphereGeometry(1.15, 20, 14),
+   256→   956→      new THREE.MeshStandardMaterial({ color: 0x8d8880, roughness: 0.5, metalness: 0.55 })
+   257→   957→    );
+   258→   958→    waterTank.position.set(9.5, 5.4, 7);
+   259→   959→    pad.add(waterTank);
+   260→   960→    for (let i = 0; i < 4; i++) {
+   261→   961→      const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+   262→   962→      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 4.8, 6), steelMat);
+   263→   963→      leg.position.set(9.5 + Math.sin(a) * 0.7, 2.4, 7 + Math.cos(a) * 0.7);
+   264→   964→      leg.rotation.z = Math.sin(a) * 0.12;
+   265→   965→      leg.rotation.x = -Math.cos(a) * 0.12;
+   266→   966→      pad.add(leg);
+   267→   967→    }
+   268→   968→
+   269→   969→    // xenon spotlight glow sprites on poles
+   270→   970→    const xenoMat = new THREE.SpriteMaterial({ map: sunTex, color: 0xfff4e2, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false });
+   271→   971→    const xenos: Array<[number, number]> = [[-7, 7], [8, -6], [-8.5, -5], [7.5, 7.5]];
+   272→   972→    xenos.forEach(([xx, xz]) => {
+   273→   973→      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.07, 3.2, 6), steelMat);
+   274→   974→      pole.position.set(xx, 1.6, xz);
+   275→   975→      pad.add(pole);
+   276→   976→      const glow = new THREE.Sprite(xenoMat.clone());
+   277→   977→      glow.scale.setScalar(2.1);
+   278→   978→      glow.position.set(xx, 3.35, xz);
+   279→   979→      pad.add(glow);
+   280→   980→    });
+   281→   981→
+   282→   982→    // perimeter lights
+   283→   983→    const periMat = new THREE.MeshBasicMaterial({ color: 0xffc966 });
+   284→   984→    for (let i = 0; i < 9; i++) {
+   285→   985→      const a = (i / 9) * Math.PI * 2 + 0.3;
+   286→   986→      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.075, 8, 8), periMat);
+   287→   987→      dot.position.set(Math.sin(a) * 18.5, 0.55, Math.cos(a) * 18.5);
+   288→   988→      pad.add(dot);
+   289→   989→    }
+   290→   990→
+   291→   991→    // ── the wider spaceport: assembly building, hangars, tank farm, a
+   292→   992→    //    second mount, a lit service road — real surroundings that keep
+   293→   993→    //    the world readable while the vehicle climbs away ──
+   294→   994→    const bldMat = new THREE.MeshStandardMaterial({ color: 0x241f2b, roughness: 0.88, metalness: 0.12 });
+   295→   995→    const winMat = new THREE.MeshBasicMaterial({ color: 0xffd9a0 });
+   296→   996→    const vab = new THREE.Mesh(new THREE.BoxGeometry(17, 13, 10), bldMat);
+   297→   997→    vab.position.set(-62, 6.5, -44);
+   298→   998→    pad.add(vab);
+   299→   999→    const vabDoor = new THREE.Mesh(
+   300→  1000→      new THREE.PlaneGeometry(5.5, 11),
+   301→  1001→      new THREE.MeshStandardMaterial({ color: 0x191521, roughness: 0.9 })
+   302→  1002→    );
+   303→  1003→    vabDoor.position.set(-62, 5.6, -38.94);
+   304→  1004→    pad.add(vabDoor);
+   305→  1005→    const vabWin = new THREE.Mesh(new THREE.PlaneGeometry(15.6, 0.4), winMat);
+   306→  1006→    vabWin.position.set(-62, 10.4, -38.9);
+   307→  1007→    pad.add(vabWin);
+   308→  1008→    // quonset hangars
+   309→  1009→    [[-36, -10, 0.35], [-44, 10, -0.25]].forEach(([hx, hz, hr]) => {
+   310→  1010→      const hg = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 10, 18, 1, false, 0, Math.PI), bldMat);
+   311→  1011→      hg.rotation.z = Math.PI / 2;
+   312→  1012→      hg.rotation.y = hr;
+   313→  1013→      hg.position.set(hx, 0.15, hz);
+   314→  1014→      pad.add(hg);
+   315→  1015→    });
+   316→  1016→    // cryo tank farm
+   317→  1017→    const tankMat = new THREE.MeshStandardMaterial({ color: 0xd8d3ca, roughness: 0.42, metalness: 0.5 });
+   318→  1018→    [[26, -6], [31, -12]].forEach(([tx, tz]) => {
+   319→  1019→      const tank = new THREE.Mesh(new THREE.SphereGeometry(1.7, 18, 14), tankMat);
+   320→  1020→      tank.position.set(tx, 1.8, tz);
+   321→  1021→      pad.add(tank);
+   322→  1022→    });
+   323→  1023→    [[22, -13], [35, -4]].forEach(([tx, tz]) => {
+   324→  1024→      const hTank = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 5.2, 16), tankMat);
+   325→  1025→      hTank.rotation.x = Math.PI / 2;
+   326→  1026→      hTank.position.set(tx, 1.3, tz);
+   327→  1027→      pad.add(hTank);
+   328→  1028→    });
+   329→  1029→    // a second launch mount in the distance
+   330→  1030→    const mount2 = new THREE.Mesh(
+   331→  1031→      new THREE.CylinderGeometry(3.4, 4, 0.5, 24),
+   332→  1032→      new THREE.MeshStandardMaterial({ color: 0x37343c, roughness: 0.9 })
+   333→  1033→    );
+   334→  1034→    mount2.position.set(48, 0.25, -64);
+   335→  1035→    pad.add(mount2);
+   336→  1036→    for (let i = 0; i < 3; i++) {
+   337→  1037→      const mm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.16, 12, 6), steelMat);
+   338→  1038→      mm.position.set(48 + Math.sin(i * 2.1) * 2.6, 6, -64 + Math.cos(i * 2.1) * 2.6);
+   339→  1039→      pad.add(mm);
+   340→  1040→    }
+   341→  1041→    const mount2Beacon = new THREE.Sprite(beaconTexMat());
+   342→  1042→    mount2Beacon.scale.setScalar(1.2);
+   343→  1043→    mount2Beacon.position.set(48, 12.6, -64);
+   344→  1044→    masts.push(mount2Beacon); // blinks with the lightning masts
+   345→  1045→    pad.add(mount2Beacon);
+   346→  1046→    // service road + edge dots
+   347→  1047→    const road = new THREE.Mesh(
+   348→  1048→      new THREE.PlaneGeometry(3.2, 60),
+   349→  1049→      new THREE.MeshStandardMaterial({ color: 0x191622, roughness: 0.95 })
+   350→  1050→    );
+   351→  1051→    road.rotation.x = -Math.PI / 2;
+   352→  1052→    road.rotation.z = 0.5;
+   353→  1053→    road.position.set(-26, 0.06, -20);
+   354→  1054→    pad.add(road);
+   355→  1055→    for (let i = 0; i < 10; i++) {
+   356→  1056→      const rr = 6 + i * 5.4;
+   357→  1057→      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.09, 6, 6), periMat);
+   358→  1058→      dot.position.set(-26 + Math.sin(0.5) * rr, 0.35, -20 + Math.cos(0.5) * rr);
+   359→  1059→      pad.add(dot);
+   360→  1060→    }
+   361→  1061→    // a glittering city far beyond the fence — the reason the dusk horizon
+   362→  1062→    // stays recognizable while everything else falls away
+   363→  1063→    const cityLightMat = new THREE.SpriteMaterial({ map: glowTex, color: 0xffb877, transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false });
+   364→  1064→    const cityLights: THREE.Sprite[] = [];
+   365→  1065→    for (let i = 0; i < (isMobile ? 22 : 46); i++) {
+   366→  1066→      const s = new THREE.Sprite(cityLightMat.clone());
+   367→  1067→      const a = Math.random() * Math.PI * 2;
+   368→  1068→      const r = 58 + Math.random() * 115;
+   369→  1069→      const sc = 1.0 + Math.random() * 2.0;
+   370→  1070→      s.scale.set(sc * 1.7, sc, 1);
+   371→  1071→      s.position.set(Math.sin(a) * r, 0.4 + Math.random() * 1.8, Math.cos(a) * r);
+   372→  1072→      s.userData.tw = Math.random() * Math.PI * 2;
+   373→  1073→      pad.add(s);
+   374→  1074→      cityLights.push(s);
+   375→  1075→    }
+   376→  1076→
+   377→  1077→    // ── ground life around the pad: crawler, landing pads, a retired
+   378→  1078→    //    booster on display, dishes, guard booth, service vehicles —
+   379→  1079→    //    the pad must read as a WORKED place, not a stage set ──
+   380→  1080→    {
+   381→  1081→      // crawler-transporter parked on the crawlerway
+   382→  1082→      const crawler = new THREE.Group();
+   383→  1083→      crawler.position.set(16, 0, 15);
+   384→  1084→      crawler.rotation.y = -0.55;
+   385→  1085→      const deck = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.9, 3.4), steelMat);
+   386→  1086→      deck.position.y = 1.45;
+   387→  1087→      crawler.add(deck);
+   388→  1088→      const cab = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.85, 1.2), steelMat);
+   389→  1089→      cab.position.set(-2.3, 2.3, 1.05);
+   390→  1090→      crawler.add(cab);
+   391→  1091→      for (let i = 0; i < 4; i++) {
+   392→  1092→        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.75, 12), darkMat);
+   393→  1093→        w.rotation.x = Math.PI / 2;
+   394→  1094→        w.position.set(-1.8 + (i % 2) * 3.6, 0.55, i < 2 ? -1.25 : 1.25);
+   395→  1095→        crawler.add(w);
+   396→  1096→      }
+   397→  1097→      const crawlerBeacon = new THREE.Sprite(beaconTexMat());
+   398→  1098→      crawlerBeacon.scale.setScalar(0.9);
+   399→  1099→      crawlerBeacon.position.set(-2.3, 3.1, 1.05);
+   400→  1100→      masts.push(crawlerBeacon);
+   401→  1101→      crawler.add(crawlerBeacon);
+   402→  1102→      pad.add(crawler);
+   403→  1103→
+   404→  1104→      // two flyback landing pads with crossed X markings + corner lights
+   405→  1105→      const lpMat = new THREE.MeshStandardMaterial({ color: 0x45424a, roughness: 0.92 });
+   406→  1106→      [[20, 6], [27, -4]].forEach(([lx, lz]) => {
+   407→  1107→        const lp = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 2.9, 0.24, 26), lpMat);
+   408→  1108→        lp.position.set(lx, 0.12, lz);
+   409→  1109→        pad.add(lp);
+   410→  1110→        [0.7, -0.7].forEach((rk) => {
+   411→  1111→          const bar = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.03, 0.5), periMat);
+   412→  1112→          bar.position.set(lx, 0.26, lz);
+   413→  1113→          bar.rotation.y = rk;
+   414→  1114→          pad.add(bar);
+   415→  1115→        });
+   416→  1116→        [[1.9, 1.9], [-1.9, 1.9], [1.9, -1.9], [-1.9, -1.9]].forEach(([dx, dz]) => {
+   417→  1117→          const dot = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 6), periMat);
+   418→  1118→          dot.position.set(lx + dx, 0.3, lz + dz);
+   419→  1119→          pad.add(dot);
+   420→  1120→        });
+   421→  1121→      });
+   422→  1122→
+   423→  1123→      // the rocket garden — a retired booster standing on display
+   424→  1124→      const garden = new THREE.Group();
+   425→  1125→      garden.position.set(-17, 0, 11);
+   426→  1126→      garden.rotation.y = 0.4;
+   427→  1127→      const oldBody = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 6.2, 18), sootMat);
+   428→  1128→      oldBody.position.y = 3.1;
+   429→  1129→      garden.add(oldBody);
+   430→  1130→      const oldNose = new THREE.Mesh(new THREE.ConeGeometry(0.55, 0.9, 18), sootMat);
+   431→  1131→      oldNose.position.y = 6.6;
+   432→  1132→      garden.add(oldNose);
+   433→  1133→      for (let i = 0; i < 4; i++) {
+   434→  1134→        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+   435→  1135→        const ol = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.7, 0.22), darkMat);
+   436→  1136→        ol.position.set(Math.sin(a) * 0.75, 0.55, Math.cos(a) * 0.75);
+   437→  1137→        ol.rotation.z = Math.sin(a) * 0.5;
+   438→  1138→        ol.rotation.x = -Math.cos(a) * 0.5;
+   439→  1139→        garden.add(ol);
+   440→  1140→      }
+   441→  1141→      const gardenSpot = new THREE.Sprite(xenoMat.clone());
+   442→  1142→      gardenSpot.scale.setScalar(1.6);
+   443→  1143→      gardenSpot.position.set(0.9, 1.2, 0.9);
+   444→  1144→      garden.add(gardenSpot);
+   445→  1145→      pad.add(garden);
+   446→  1146→
+   447→  1147→      // comms dish array on two mounds
+   448→  1148→      const moundMat = new THREE.MeshStandardMaterial({ color: 0x0c0910, roughness: 1 });
+   449→  1149→      [[-22, -16, 0.6], [30, -22, -0.4]].forEach(([dx, dz, dr]) => {
+   450→  1150→        const mound = new THREE.Mesh(new THREE.SphereGeometry(1.6, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), moundMat);
+   451→  1151→        mound.position.set(dx, 0, dz);
+   452→  1152→        pad.add(mound);
+   453→  1153→        const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 1.6, 8), steelMat);
+   454→  1154→        mast.position.set(dx, 1.6, dz);
+   455→  1155→        pad.add(mast);
+   456→  1156→        const dish = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.18, 0.5, 16, 1, true), steelMat);
+   457→  1157→        dish.position.set(dx, 2.6, dz);
+   458→  1158→        dish.rotation.z = dr;
+   459→  1159→        pad.add(dish);
+   460→  1160→      });
+   461→  1161→
+   462→  1162→      // security gate: fence posts, gate, guard booth with a warm window
+   463→  1163→      const fenceMat = new THREE.MeshStandardMaterial({ color: 0x1c1922, roughness: 0.85, metalness: 0.3 });
+   464→  1164→      for (let i = 0; i < 9; i++) {
+   465→  1165→        const post = new THREE.Mesh(new THREE.BoxGeometry(0.09, 1.7, 0.09), fenceMat);
+   466→  1166→        post.position.set(6 + i * 3.1, 0.85, 24);
+   467→  1167→        pad.add(post);
+   468→  1168→      }
+   469→  1169→      const gateBar = new THREE.Mesh(new THREE.BoxGeometry(4.6, 0.12, 0.12), fenceMat);
+   470→  1170→      gateBar.position.set(19, 1.1, 24);
+   471→  1171→      pad.add(gateBar);
+   472→  1172→      const booth = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.35, 1.4), fenceMat);
+   473→  1173→      booth.position.set(21.6, 0.68, 23);
+   474→  1174→      pad.add(booth);
+   475→  1175→      const boothWin = new THREE.Mesh(new THREE.PlaneGeometry(0.7, 0.4), winMat);
+   476→  1176→      boothWin.position.set(21.6, 0.95, 22.29);
+   477→  1177→      pad.add(boothWin);
+   478→  1178→
+   479→  1179→      // two ground-support vehicles with amber beacons
+   480→  1180→      [[7, 12, 0.9], [-9, 13, -0.3]].forEach(([vx, vz, vr]) => {
+   481→  1181→        const truck = new THREE.Group();
+   482→  1182→        truck.position.set(vx, 0, vz);
+   483→  1183→        truck.rotation.y = vr;
+   484→  1184→        const bed = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.55, 0.8), steelMat);
+   485→  1185→        bed.position.y = 0.55;
+   486→  1186→        truck.add(bed);
+   487→  1187→        const cab2 = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.5, 0.75), darkMat);
+   488→  1188→        cab2.position.set(0.9, 1.05, 0);
+   489→  1189→        truck.add(cab2);
+   490→  1190→        const tb = new THREE.Sprite(beaconTexMat());
+   491→  1191→        tb.scale.setScalar(0.55);
+   492→  1192→        tb.position.set(0.9, 1.5, 0);
+   493→  1193→        masts.push(tb);
+   494→  1194→        truck.add(tb);
+   495→  1195→        pad.add(truck);
+   496→  1196→      });
+   497→  1197→
+   498→  1198→      // helium tank cluster + flag pole
+   499→  1199→      [[14, -9], [15.4, -10], [13.4, -10.6]].forEach(([hx, hz]) => {
+   500→  1200→        const ht = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 2.1, 14), tankMat);
+   501→  1201→        ht.position.set(hx, 1.15, hz);
+   502→  1202→        pad.add(ht);
+   503→  1203→      });
+   504→  1204→      const flagPole = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 3.4, 8), steelMat);
+   505→  1205→      flagPole.position.set(5.5, 1.7, 10);
+   506→  1206→      pad.add(flagPole);
+   507→  1207→      const flag = new THREE.Mesh(
+   508→  1208→        new THREE.PlaneGeometry(1.05, 0.62),
+   509→  1209→        new THREE.MeshStandardMaterial({ color: 0xff6a2e, roughness: 0.8, side: THREE.DoubleSide })
+   510→  1210→      );
+   511→  1211→      flag.position.set(6.05, 2.95, 10);
+   512→  1212→      pad.add(flag);
+   513→  1213→
+   514→  1214→      // a floodlight bank watching the deck
+   515→  1215→      const floodPole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 4.6, 8), steelMat);
+   516→  1216→      floodPole.position.set(-12, 2.3, -13);
+   517→  1217→      pad.add(floodPole);
+   518→  1218→      const floodGlow = new THREE.Sprite(xenoMat.clone());
+   519→  1219→      floodGlow.scale.setScalar(2.6);
+   520→  1220→      floodGlow.position.set(-12, 4.8, -13);
+   521→  1221→      pad.add(floodGlow);
+   522→  1222→    }
+   523→  1223→
+   524→  1224→    // ground haze
+   525→  1225→    const hazeMat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, opacity: 0.16, depthWrite: false });
+   526→  1226→    for (let i = 0; i < (isMobile ? 4 : 7); i++) {
+   527→  1227→      const h = new THREE.Sprite(hazeMat.clone());
+   528→  1228→      const hs = 24 + Math.random() * 30;
+   529→  1229→      h.scale.set(hs, hs * 0.24, 1);
+   530→  1230→      h.position.set((Math.random() - 0.5) * 70, 1.6 + Math.random() * 2.2, (Math.random() - 0.5) * 50);
+   531→  1231→      pad.add(h);
+   532→  1232→    }
+   533→  1233→
+   534→  1234→    // distant hills + far city glow
+   535→  1235→    const hillMat = new THREE.MeshStandardMaterial({ color: 0x0c0910, roughness: 1 });
+   536→  1236→    for (let i = 0; i < 11; i++) {
+   537→  1237→      const a = (i / 11) * Math.PI * 2 + Math.random() * 0.4;
+   538→  1238→      const r = 135 + Math.random() * 105;
+   539→  1239→      const hill = new THREE.Mesh(new THREE.SphereGeometry(16 + Math.random() * 22, 12, 8), hillMat);
+   540→  1240→      hill.scale.y = 0.1 + Math.random() * 0.1;
+   541→  1241→      hill.position.set(Math.sin(a) * r, 0, Math.cos(a) * r);
+   542→  1242→      pad.add(hill);
+   543→  1243→    }
+   544→  1244→    const cityGlow = new THREE.Sprite(
+   545→  1245→      new THREE.SpriteMaterial({ map: glowTex, color: 0xff9a4a, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false })
+   546→  1246→    );
+   547→  1247→    cityGlow.scale.set(70, 9, 1);
+   548→  1248→    cityGlow.position.set(160, 3.5, -200);
+   549→  1249→    pad.add(cityGlow);
+   550→  1250→
+   551→  1251→    const horizonGlow = new THREE.Sprite(
+   552→  1252→      new THREE.SpriteMaterial({ map: glowTex, color: 0xff9a4a, transparent: true, opacity: 0.26, blending: THREE.AdditiveBlending, depthWrite: false })
+   553→  1253→    );
+   554→  1254→    horizonGlow.scale.set(100, 16, 1);
+   555→  1255→    horizonGlow.position.y = 2;
+   556→  1256→    pad.add(horizonGlow);
+   557→  1257→    scene.add(pad);
+   558→  1258→
+   559→  1259→    // sun low on the horizon (dusk) — sinks away as we climb
+   560→  1260→    const sun = new THREE.Sprite(
+   561→  1261→      new THREE.SpriteMaterial({ map: sunTex, color: 0xffe0b0, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending, depthWrite: false })
+   562→  1262→    );
+   563→  1263→    sun.scale.setScalar(21);
+   564→  1264→    sun.position.set(-190, 13, -430);
+   565→  1265→    scene.add(sun);
+   566→  1266→
+   567→  1267→    // ── Earth (curved limb + clouds + atmosphere rim) ─────────
+   568→  1268→    const earth = new THREE.Group();
+   569→  1269→    const EARTH_R = 1500;
+   570→  1270→    const earthBodyMat = new THREE.MeshStandardMaterial({
+   571→  1271→      map: earthSurfTex,
+   572→  1272→      color: 0xd8e4ee,
+   573→  1273→      roughness: 0.66,
+   574→  1274→      metalness: 0.06,
+   575→  1275→      emissive: 0x0d2033,
+   576→  1276→      emissiveIntensity: 0.72,
+   577→  1277→      transparent: true,
+   578→  1278→      opacity: 0,
+   579→  1279→    });
+   580→  1280→    const earthBody = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R, isMobile ? 48 : 80, isMobile ? 32 : 56), earthBodyMat);
+   581→  1281→    earth.add(earthBody);
+   582→  1282→    const earthCloudsMat = new THREE.MeshStandardMaterial({
+   583→  1283→      map: earthCloudsTex,
+   584→  1284→      color: 0xffffff,
+   585→  1285→      transparent: true,
+   586→  1286→      opacity: 0,
+   587→  1287→      depthWrite: false,
+   588→  1288→      roughness: 0.9,
+   589→  1289→    });
+   590→  1290→    const earthClouds = new THREE.Mesh(new THREE.SphereGeometry(EARTH_R * 1.005, isMobile ? 48 : 72, isMobile ? 32 : 48), earthCloudsMat);
+   591→  1291→    earth.add(earthClouds);
+   592→  1292→    // atmosphere halo — a soft additive ring hugging the limb (sprite, depth-tested)
+   593→  1293→    const atmoSprite = new THREE.Sprite(
+   594→  1294→      new THREE.SpriteMaterial({ map: atmoRingTex, color: 0xbcd4ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false })
+   595→  1295→    );
+   596→  1296→    atmoSprite.scale.set(4450, 4450, 1);
+   597→  1297→    earth.add(atmoSprite);
+   598→  1298→    earth.position.set(0, -EARTH_R - 4, 0);
+   599→  1299→    earth.visible = false;
+   600→  1300→    scene.add(earth);
+   601→  1301→
+   602→  1302→    // soft "sunrise" fill so the camera-facing side reads as ocean, not void
+   603→  1303→    const earthSun = new THREE.DirectionalLight(0xbfd9ff, 0);
+   604→  1304→    earthSun.position.set(0, 0, 120);
+   605→  1305→    scene.add(earthSun, earthSun.target);
+   606→  1306→
+   607→  1307→    // ── orbital space station ─────────────────────────────────
+   608→  1308→    const station = new THREE.Group();
+   609→  1309→    const hullMat = new THREE.MeshStandardMaterial({ color: 0xd9d5cc, roughness: 0.4, metalness: 0.62, transparent: true, opacity: 0 });
+   610→  1310→    const panelMat = new THREE.MeshStandardMaterial({ map: solarTex, color: 0xcfd8e8, roughness: 0.28, metalness: 0.55, emissive: 0x16263f, emissiveIntensity: 0.6, transparent: true, opacity: 0 });
+   611→  1311→    const stationGlowMats: THREE.Material[] = [hullMat, panelMat];
+   612→  1312→
+   613→  1313→    const truss = new THREE.Mesh(new THREE.BoxGeometry(9.4, 0.2, 0.2), hullMat);
+   614→  1314→    station.add(truss);
+   615→  1315→    [-2.4, 2.4].forEach((mx) => {
+   616→  1316→      const mod = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 2.8, 16), hullMat);
+   617→  1317→      mod.rotation.z = Math.PI / 2;
+   618→  1318→      mod.position.x = mx;
+   619→  1319→      station.add(mod);
+   620→  1320→      const cap = new THREE.Mesh(new THREE.SphereGeometry(0.46, 16, 12), hullMat);
+   621→  1321→      cap.position.x = mx + Math.sign(mx) * 1.4;
+   622→  1322→      station.add(cap);
+   623→  1323→      const ring = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.07, 8, 20), hullMat);
+   624→  1324→      ring.position.x = mx + Math.sign(mx) * 1.72;
+   625→  1325→      ring.rotation.y = Math.PI / 2;
+   626→  1326→      station.add(ring);
+   627→  1327→    });
+   628→  1328→    const habitat = new THREE.Mesh(new THREE.SphereGeometry(0.66, 20, 16), hullMat);
+   629→  1329→    habitat.position.y = 0.55;
+   630→  1330→    station.add(habitat);
+   631→  1331→    const dockTunnel = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.55, 12), hullMat);
+   632→  1332→    dockTunnel.position.y = 0.28;
+   633→  1333→    station.add(dockTunnel);
+   634→  1334→    [-3.9, -5.6, 3.9, 5.6].forEach((px) => {
+   635→  1335→      const wing = new THREE.Mesh(new THREE.BoxGeometry(2.9, 0.05, 1.0), panelMat);
+   636→  1336→      wing.position.set(px + Math.sign(px) * 0.6, 0, 0);
+   637→  1337→      wing.rotation.y = 0;
+   638→  1338→      station.add(wing);
+   639→  1339→      const spar = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.06, 0.06), hullMat);
+   640→  1340→      spar.position.set(px, 0, 0);
+   641→  1341→      station.add(spar);
+   642→  1342→    });
+   643→  1343→    [-1.2, 1.2].forEach((rx) => {
+   644→  1344→      const radiator = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.04, 0.55), hullMat);
+   645→  1345→      radiator.position.set(rx, -0.55, 0.1);
+   646→  1346→      radiator.rotation.x = 0.2;
+   647→  1347→      station.add(radiator);
+   648→  1348→    });
+   649→  1349→    // second habitat sphere + node — a bigger, lived-in complex
+   650→  1350→    const habitat2 = new THREE.Mesh(new THREE.SphereGeometry(0.5, 18, 14), hullMat);
+   651→  1351→    habitat2.position.set(-0.4, -0.62, 0.25);
+   652→  1352→    station.add(habitat2);
+   653→  1353→    const node = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.7, 12), hullMat);
+   654→  1354→    node.rotation.x = Math.PI / 2;
+   655→  1355→    node.position.set(-0.4, -0.3, 0.25);
+   656→  1356→    station.add(node);
+   657→  1357→    // comms antenna mast
+   658→  1358→    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.1, 8), hullMat);
+   659→  1359→    mast.position.set(0.4, 1.35, 0);
+   660→  1360→    station.add(mast);
+   661→  1361→    const antenna = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.2, 10, 1, true), hullMat);
+   662→  1362→    antenna.position.set(0.4, 1.95, 0);
+   663→  1363→    station.add(antenna);
+   664→  1364→    const stationBeacon = new THREE.Sprite(beaconTexMat());
+   665→  1365→    stationBeacon.scale.setScalar(1.1);
+   666→  1366→    stationBeacon.position.set(4.8, 0.4, 0);
+   667→  1367→    station.add(stationBeacon);
+   668→  1368→    station.position.set(-13, 116, -32);
+   669→  1369→    station.rotation.z = 0.16;
+   670→  1370→    station.scale.setScalar(1.7);
+   671→  1371→    station.visible = false;
+   672→  1372→    scene.add(station);
+   673→  1373→
+   674→  1374→    // ── SECOND station: a rotating centrifuge wheel further down the
+   675→  1375→    //    corridor — deep space is inhabited, not empty ──
+   676→  1376→    const wheelMats: THREE.Material[] = [];
+   677→  1377→    const wheelRimMat = new THREE.MeshStandardMaterial({ color: 0xd5cfc2, roughness: 0.4, metalness: 0.62, transparent: true, opacity: 0 });
+   678→  1378→    const wheelPanelMat = new THREE.MeshStandardMaterial({ map: solarTex, color: 0xcfd8e8, roughness: 0.28, metalness: 0.55, emissive: 0x16263f, emissiveIntensity: 0.7, transparent: true, opacity: 0 });
+   679→  1379→    wheelMats.push(wheelRimMat, wheelPanelMat);
+   680→  1380→    const wheel = new THREE.Group();
+   681→  1381→    const wheelRim = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.34, 12, 42), wheelRimMat);
+   682→  1382→    wheel.add(wheelRim);
+   683→  1383→    const rimInner = new THREE.Mesh(new THREE.TorusGeometry(2.9, 0.12, 8, 42), wheelRimMat);
+   684→  1384→    wheel.add(rimInner);
+   685→  1385→    for (let i = 0; i < 4; i++) {
+   686→  1386→      const a = (i / 4) * Math.PI * 2;
+   687→  1387→      const spoke = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 3.3, 8), wheelRimMat);
+   688→  1388→      spoke.position.set(Math.cos(a) * 1.65, Math.sin(a) * 1.65, 0);
+   689→  1389→      spoke.rotation.z = a + Math.PI / 2;
+   690→  1390→      wheel.add(spoke);
+   691→  1391→      const pod = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.34, 0.55), wheelRimMat);
+   692→  1392→      pod.position.set(Math.cos(a) * 3.15, Math.sin(a) * 3.15, 0);
+   693→  1393→      pod.rotation.z = a;
+   694→  1394→      wheel.add(pod); // habitat pods hanging on the rim
+   695→  1395→    }
+   696→  1396→    const hub = new THREE.Mesh(new THREE.SphereGeometry(0.85, 18, 14), wheelRimMat);
+   697→  1397→    wheel.add(hub);
+   698→  1398→    const dockTube = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 1.5, 10), wheelRimMat);
+   699→  1399→    dockTube.rotation.x = Math.PI / 2;
+   700→  1400→    dockTube.position.z = 1.2;
+   701→
+   702→[showing lines 701-1400 of 2727; use offset=1401 with limit to continue reading]

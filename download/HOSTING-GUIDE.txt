@@ -1,0 +1,188 @@
+====================================================================
+  MESKAT'S PORTFOLIO — GITHUB + VERCEL HOSTING GUIDE
+  (step by step · no coding needed · ~15 minutes total)
+====================================================================
+
+WHAT YOU NEED
+-------------
+  1. The full project folder (download everything from the chat,
+     keep it in ONE place, e.g. Desktop/portfolio)
+  2. A GitHub account   ->  https://github.com      (free)
+  3. A Vercel account   ->  https://vercel.com      (free — sign up
+     USING YOUR GITHUB ACCOUNT, it connects them in one click)
+
+
+====================================================================
+STEP 0 — CHECK THE FOLDER (10 seconds)
+====================================================================
+Open the downloaded folder. You MUST see:
+     src/ , public/ , package.json , next.config.ts , tsconfig.json
+If you see those — perfect, that is the whole website.
+
+DO NOT upload these if you see them:
+     X  node_modules/     (huge + useless — Vercel rebuilds it itself)
+     X  .next/            (build cache)
+     X  .env  /  .env.local
+        (contains your secret API key — NEVER make it public!)
+
+
+====================================================================
+STEP 1 — CREATE THE GITHUB REPO (2 minutes)
+====================================================================
+  1. Go to  github.com  and log in.
+  2. Click the  +  icon (top-right)  ->  "New repository".
+  3. Repository name:   meskat-portfolio    (any name is fine)
+  4. Choose  Public  (needed for free Vercel hosting).
+  5. Do NOT tick "Add a README file" (the project already has one).
+  6. Click  "Create repository".
+
+
+====================================================================
+STEP 2 — UPLOAD ALL PROJECT FILES (5 minutes)
+====================================================================
+EASIEST WAY (browser only, nothing to install):
+  1. On the new empty repo page click the link
+        "uploading an existing file"
+  2. Open your project folder in File Explorer / Finder.
+  3. Select EVERYTHING in the folder EXCEPT
+        node_modules, .next, .env
+     (Ctrl+A, then hold Ctrl and click those 3 to deselect them)
+  4. Drag the selected files INTO the GitHub upload box.
+  5. Wait until the upload finishes (folders keep their structure).
+  6. Click the big green  "Commit changes"  button.
+
+BETTER WAY for future updates (optional):
+  Install "GitHub Desktop" (desktop.github.com) ->
+  File -> Add local repository -> select the folder ->
+  write a short message -> "Commit to main" -> "Push origin".
+
+
+====================================================================
+STEP 3 — HOST ON VERCEL (3 minutes)
+====================================================================
+  1. Go to  vercel.com  ->  "Sign Up"  ->  "Continue with GitHub".
+  2. Allow Vercel to access your repositories.
+  3. On the dashboard:  "Add New..."  ->  "Project".
+  4. Find  meskat-portfolio  in the list  ->  "Import".
+  5. Framework Preset auto-detects "Next.js" — change NOTHING.
+  6. Open "Environment Variables" and add ONE variable so the
+     ORION AI runs at full speed:
+     
+          Name  :  GROQ_API_KEY
+          Value :  your Groq key
+          
+     (free key: console.groq.com -> "API Keys" -> Create Key)
+     No key yet? Skip it — ORION still talks on the backup engine.
+  7. Click  "Deploy"  and wait 1–2 minutes.
+  8. DONE. Your website is LIVE at:
+     
+          https://meskat-portfolio.vercel.app
+     
+     (Vercel shows you the exact link — share that everywhere:
+      CV, Discord, X, bio.)
+
+
+====================================================================
+STEP 4 — HOW TO UPDATE THE SITE LATER (1 minute)
+====================================================================
+  1. Change any file in your local folder.
+  2. GitHub repo -> "Add file" -> "Upload files" ->
+     drop the CHANGED file -> "Commit changes".
+  3. Vercel notices it AUTOMATICALLY and republishes the site.
+     (If you use GitHub Desktop: Commit -> Push origin. Same result.)
+
+
+====================================================================
+IF SOMETHING GOES WRONG
+====================================================================
+  * Build failed on Vercel
+      -> almost always a missing file: make sure  src/ , public/ ,
+         package.json  uploaded completely (open the repo on GitHub
+         and compare with your local folder).
+
+  * ORION AI is silent / slow
+      -> the GROQ_API_KEY variable is missing or misspelled on Vercel:
+         Project -> Settings -> Environment Variables -> fix it ->
+         Deployments tab -> "... " -> Redeploy.
+
+  * Page shows 404 right after deploy
+      -> wait 1 minute and refresh; check the Deployments tab is green.
+
+  * Want your own domain (like meskat.dev)?
+      -> Vercel -> Project -> Settings -> Domains -> Add,
+         then follow its DNS instructions. Free subdomain works forever.
+
+  * Uploaded node_modules by mistake?
+      -> no disaster: on GitHub delete the folder (Add file -> upload
+         can't delete; use github.com -> open folder -> delete via
+         "..." ), or just re-create the repo and re-upload clean.
+
+--------------------------------------------------------------------
+  One line summary:
+  GitHub e folder upload -> Vercel e import -> GROQ_API_KEY add ->
+  Deploy -> link share.  That's it.
+--------------------------------------------------------------------
+
+====================================================================
+  FIX: "404 DEPLOYMENT_NOT_FOUND" (September 2026 incident)
+--------------------------------------------------------------------
+  What happened:
+    The GitHub upload only carried the loose files at the top level
+    (package.json, next.config.ts, bun.lock, README, .env.example...).
+    The ENTIRE src/ folder, the ENTIRE public/ folder and
+    prisma/schema.prisma never reached GitHub. So on Vercel:
+
+      1. postinstall "prisma generate" failed  ->  no schema file
+      2. even without that, "next build" needs src/app/  ->  instant fail
+      3. a failed build = NO deployment exists  ->  the site URL shows
+         "DEPLOYMENT_NOT_FOUND". (A 404 page with that code literally
+         means: nothing was ever successfully deployed to that URL.)
+
+  The fix (10 minutes):
+    Step 1 — update 2 files you already have:
+        package.json  : the "postinstall" line was REMOVED
+                        (the Prisma database is unused dead code;
+                         generating its client on Vercel was pointless)
+        src/app/api/mind/route.ts : ORION's fallback engine is now
+                        lazy + fail-safe (can never 500 the endpoint)
+        -> both changed in this project already; re-download or copy them.
+
+    Step 2 — upload what is missing on github.com/axiomdeploy/meskat-alam-portfolio
+        a) "Add file" -> "Upload files" -> drag the WHOLE  src  folder
+           -> Commit changes.  (drag the folder itself, not its contents)
+        b) "Add file" -> "Upload files" -> drag the WHOLE  public  folder
+           -> Commit changes.
+        c) "Add file" -> "Upload files" -> drop the NEW package.json
+           (and src/app/api/mind/route.ts inside the src upload covers
+            itself) -> Commit.
+        Rule: upload ONE folder per commit and eyeball the file count
+        afterwards. GitHub web upload silently drops anything past 100
+        files in a single drag — that is most likely how src/ was lost.
+
+    Step 3 — verify on GitHub (60 seconds):
+        repo root must show BOTH folders:  src  and  public
+        open src/app/page.tsx on GitHub — it must render code.
+
+    Step 4 — Vercel:
+        every push auto-triggers a build. Watch
+        Vercel -> your project -> Deployments.
+          - green "Ready"  -> open https://meskat-alam-portfolio.vercel.app/
+          - red "Error"    -> click it -> read the log -> the FIRST red
+                             line is the real cause; fix that only.
+        If the Deployments tab is EMPTY even after pushing:
+          Settings -> Git -> "Connect Git Repository" ->
+          authorize the Vercel GitHub app for THIS repo, then push any
+          commit (empty is fine: git commit --allow-empty -m "go" && git push)
+        Deployments still failing after src/ + public/ landed?
+          Check: Framework Preset = Next.js, Root Directory = EMPTY,
+          Build Command = empty (default), Output Directory = empty.
+
+    Step 5 — after ANY env var change (GROQ_API_KEY etc.):
+        you MUST redeploy — env changes never apply to old deployments.
+        Never put the key in any file; Vercel env vars only. The key is
+        only ever read by src/app/api/mind/route.ts on the server side.
+
+  Sanity rules so this never repeats:
+    - never upload: node_modules, .next, .env   (gitignore already blocks
+      them if you use Git/GitHub Desktop instead of the web uploader)
+    - GitHub Desktop or git CLI is the safer upload path for 100+ files
