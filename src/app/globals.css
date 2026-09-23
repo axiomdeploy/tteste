@@ -1,0 +1,325 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-card: var(--card);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-gold: var(--gold);
+  --color-ember: var(--ember);
+  --color-muted: var(--muted);
+  --color-cream: var(--cream);
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+}
+
+:root {
+  --background: #08060a;
+  --surface: #100d12;
+  --card: rgba(255, 255, 255, 0.035);
+  --line: rgba(255, 171, 105, 0.14);
+  --accent: #ff8b3d;
+  --accent-soft: #ffb37a;
+  --gold: #ffc966;
+  --ember: #ff5e2b;
+  --muted: #a99b8e;
+  --cream: #f5efe6;
+}
+
+/* NOTE: no custom universal reset here — Tailwind v4's preflight already resets
+   margins/padding inside @layer base. An unlayered `* { padding: 0 }` would
+   out-rank EVERY layered utility (p-*, px-*, mt-*) and collapse all spacing. */
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  /* clip (not hidden) — kills ANY horizontal bleed at the root without
+     turning html into a scroll container; belt-and-braces against
+     canvas/grid intrinsic-size blowouts on desktop-mode phones */
+  overflow-x: clip;
+}
+
+body {
+  background: var(--background);
+  color: var(--cream);
+  font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
+  overflow-x: clip;
+  -webkit-font-smoothing: antialiased;
+  touch-action: pan-y pinch-zoom;
+}
+
+body.locked {
+  overflow: hidden;
+}
+
+::selection {
+  background: rgba(255, 139, 61, 0.85);
+  color: #140b04;
+}
+
+/* scrollbar fully hidden — the journey itself is the progress meter.
+   Scrolling keeps working; the bar just never shows (Firefox + WebKit). */
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-thumb {
+  display: none;
+}
+
+/* ── shared pieces ─────────────────────────────── */
+
+.stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--accent-soft);
+  padding: 9px 18px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 139, 61, 0.05);
+  backdrop-filter: blur(6px);
+}
+
+.stage-chip .chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  box-shadow: 0 0 12px 2px rgba(255, 139, 61, 0.7);
+  animation: pulse-dot 2.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.72);
+  }
+}
+
+.glass {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(18px);
+}
+
+.flame-text {
+  background: linear-gradient(100deg, #ffb37a 0%, #ff8b3d 45%, #ff5e2b 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* grain overlay for the "human made" texture */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: -100%;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 250 250' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.7' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: grain-shift 0.9s steps(4) infinite;
+}
+
+@keyframes grain-shift {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-2%, 3%);
+  }
+  50% {
+    transform: translate(3%, -2%);
+  }
+  75% {
+    transform: translate(-3%, -3%);
+  }
+  100% {
+    transform: translate(2%, 2%);
+  }
+}
+
+/* magnetic buttons */
+.btn-flame {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  color: #180c03;
+  background: linear-gradient(120deg, #ffb37a, #ff8b3d 55%, #ff6a2e);
+  border-radius: 999px;
+  padding: 16px 32px;
+  border: none;
+  overflow: hidden;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s;
+  box-shadow: 0 8px 32px -8px rgba(255, 110, 40, 0.55);
+}
+
+.btn-flame:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 44px -8px rgba(255, 110, 40, 0.7);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--cream);
+  border-radius: 999px;
+  padding: 16px 32px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(10px);
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.btn-ghost:hover {
+  border-color: rgba(255, 171, 105, 0.45);
+  background: rgba(255, 139, 61, 0.08);
+  transform: translateY(-2px);
+}
+
+/* project card sheen sweep */
+.tilt-card {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.tilt-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    600px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(255, 150, 70, 0.09),
+    transparent 45%
+  );
+  opacity: 0;
+  transition: opacity 0.4s;
+  pointer-events: none;
+}
+
+.tilt-card:hover::before {
+  opacity: 1;
+}
+
+/* soft canvas reveal — the WebGL scene fades in behind the preloader so
+   there is never a black "second loading" pop when it slides away */
+@keyframes canvas-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.canvas-reveal {
+  animation: canvas-reveal 1.2s ease-out both;
+}
+
+/* marquee */
+@keyframes marquee-x {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* mind system orb ping + typing dots */
+@keyframes mind-ping {
+  0% {
+    transform: scale(1);
+    opacity: 0.7;
+  }
+  70% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+@keyframes mind-bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  50% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+/* ROCKET·TV — CRT cursor blink + rolling refresh band */
+@keyframes cursor-blink {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  56%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes tv-roll {
+  0% {
+    top: -20%;
+  }
+  100% {
+    top: 110%;
+  }
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-x 26s linear infinite;
+}
+
+/* reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .marquee-track,
+  .grain::after,
+  .stage-chip .chip-dot {
+    animation: none;
+  }
+}
